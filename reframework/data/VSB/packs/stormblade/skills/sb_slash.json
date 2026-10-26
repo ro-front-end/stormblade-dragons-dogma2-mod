@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "uuid": "7a31b412-4019-4b21-99ee-b01149e1a002",
+  "id": "sb_slash",
+  "kind": "custom",
+  "presentation": {
+    "name": {
+      "en": "Arc Slash"
+    },
+    "desc": {
+      "en": "Unleash a sweeping arc of electrical force that cleaves foes from afar."
+    },
+    "icon": 5
+  },
+  "availability": {
+    "mode": "all"
+  },
+  "levels": {
+    "1": {
+      "unlock_rank": 1,
+      "dcp_cost": 300
+    },
+    "2": {
+      "unlock_rank": 3,
+      "dcp_cost": 800
+    }
+  },
+  "trigger": {
+    "type": "slot"
+  },
+  "timeline": [
+    {
+      "id": "n1",
+      "type": "script",
+      "frame": 0,
+      "fn": "return true"
+    }
+  ]
+}
+

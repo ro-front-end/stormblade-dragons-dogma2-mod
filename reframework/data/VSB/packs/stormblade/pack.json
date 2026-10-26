@@ -1,0 +1,46 @@
+{
+    "author": "Stormblade Team",
+    "description": {
+        "en": "A lightning-infused swordsman: a high-speed, magick-charged blade and storm bolts from the off hand. Built on VSB."
+    },
+    "id": "stormblade",
+    "load_order": 100,
+    "name": {
+        "en": "Stormblade"
+    },
+    "schema_version": 1,
+    "uuid": "8d94e2a1-5f21-4f10-9b4e-2895c91f0412",
+    "version": "1.0.0",
+    "vocation": {
+        "description": {
+            "en": "Wields a sword in one hand and lightning magick in the other. Prescinds from shields."
+        },
+        "enchant": "thunder_boon",
+        "name": {
+            "en": "Stormblade"
+        },
+        "progression": {
+            "difficulty": 1,
+            "unlock_rank": 1
+        },
+        "stats": {
+            "damage": 5.0,
+            "defence": 0.0,
+            "element_damage": {
+                "Thunder": 35.0
+            },
+            "element_resist": {
+                "Thunder": 40.0
+            },
+            "stagger_resist": 10.0,
+            "stamina_cost": 5.0
+        },
+        "unlock": {
+            "price": 0
+        },
+        "weapon": "Job01",
+        "icon": 46
+    },
+    "vsb_min_version": "0.1.0"
+}
+

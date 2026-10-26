@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "uuid": "7a31b412-4019-4b21-99ee-b01149e1a005",
+  "id": "sb_combo",
+  "kind": "custom",
+  "presentation": {
+    "name": {
+      "en": "Tempest Flurry"
+    },
+    "desc": {
+      "en": "A tempest of rapid strikes: vanish and strike in quick succession."
+    },
+    "icon": 9
+  },
+  "availability": {
+    "mode": "all"
+  },
+  "levels": {
+    "1": {
+      "unlock_rank": 6,
+      "dcp_cost": 2000
+    },
+    "2": {
+      "unlock_rank": 9,
+      "dcp_cost": 4000
+    }
+  },
+  "trigger": {
+    "type": "slot"
+  },
+  "timeline": [
+    {
+      "id": "n1",
+      "type": "script",
+      "frame": 0,
+      "fn": "return true"
+    }
+  ]
+}
+

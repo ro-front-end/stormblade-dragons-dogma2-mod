@@ -1,0 +1,38 @@
+# ==============================================================================
+# Git Ignore - Stormblade Custom Vocation (Dragon's Dogma 2)
+# ==============================================================================
+
+# OS & Filesystem Artefacts
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Editor & IDE Metadata
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# REFramework / In-Game Generated Data & Logs
+*.log
+*.tmp
+*.bak
+*_trace.json
+*_log.json
+*_dump.json
+diag/
+dumps/
+reframework/data/VSB/diag/
+reframework/data/DragonCore/diag/
+
+# Local Save & Pick Overrides
+*_vsb_pick.json
+Pactblade_*.json
+
+# Environment Variables & Secrets (if any tooling is added)
+.env
+.env.*
+!.env.example

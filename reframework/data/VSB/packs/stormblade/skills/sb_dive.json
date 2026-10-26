@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "uuid": "7a31b412-4019-4b21-99ee-b01149e1a004",
+  "id": "sb_dive",
+  "kind": "custom",
+  "presentation": {
+    "name": {
+      "en": "Storm Dive"
+    },
+    "desc": {
+      "en": "Vanish into a flash of lightning and plunge down upon a foe from above. Can be used mid-air."
+    },
+    "icon": 10
+  },
+  "availability": {
+    "mode": "all"
+  },
+  "levels": {
+    "1": {
+      "unlock_rank": 2,
+      "dcp_cost": 500
+    },
+    "2": {
+      "unlock_rank": 5,
+      "dcp_cost": 1200
+    }
+  },
+  "trigger": {
+    "type": "slot"
+  },
+  "timeline": [
+    {
+      "id": "n1",
+      "type": "script",
+      "frame": 0,
+      "fn": "return true"
+    }
+  ]
+}
+
