@@ -47,10 +47,10 @@
 
 - [x] **Phase 0:** Research & Architecture Design (VSB + REFramework lifecycle analysis).
 - [x] **Phase 1:** Project foundation, folder layout, `.gitignore`, and Git documentation.
-- [ ] **Phase 2:** VSB Pack declaration (`pack.json`) and registration in REFramework picks.
-- [ ] **Phase 3:** Weapon service implementation (`weapons.lua` with Duospear Thunder scaling).
-- [ ] **Phase 4:** Input & Combat service (`skills.lua` with off-hand lightning on `RB`).
-- [ ] **Phase 5:** Locomotion & Agility module (`locomotion.lua` with +12% speed).
+- [x] **Phase 2:** VSB Pack declaration (`pack.json`) and registration in REFramework picks.
+- [x] **Phase 3:** Weapon service implementation (`weapons.lua` with Duospear Thunder scaling).
+- [x] **Phase 4:** Input & Combat service (`skills.lua` with off-hand lightning on `RB`).
+- [x] **Phase 5:** Locomotion & Agility module (`locomotion.lua` with +12% speed).
 - [ ] **Phase 6:** In-game validation & refinement.
 
 ---
