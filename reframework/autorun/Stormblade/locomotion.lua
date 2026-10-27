@@ -6,7 +6,7 @@
 local core = require("Stormblade.core")
 local locomotion = {}
 
-local MOVE_SPEED_MULTIPLIER = 1.05 -- 5% boost: subtle agile feel
+local MOVE_SPEED_MULTIPLIER = 1.08 -- 8% boost: sweet spot agile feel
 local was_active = false
 
 --- Updates character movement speed
