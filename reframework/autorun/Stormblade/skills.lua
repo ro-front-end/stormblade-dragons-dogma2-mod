@@ -1,12 +1,12 @@
 -- ==============================================================================
 -- Stormblade / skills.lua
--- RB lightning projectile, 1.5x attack speed chain, and shieldless handling
+-- RB lightning projectile, 1.25x (+25%) attack speed chain, and shieldless handling
 -- ==============================================================================
 
 local core = require("Stormblade.core")
 local skills = {}
 
-local FAST_ATTACK, FAST_OTHER = 1.5, 1.2
+local FAST_ATTACK, FAST_OTHER = 1.25, 1.15
 local ONSLAUGHT_ACTIONS = {
     Job01_AttackLeft = true,
     Job01_AttackRight = true,
