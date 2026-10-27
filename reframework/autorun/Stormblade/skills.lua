@@ -1,12 +1,15 @@
 -- ==============================================================================
 -- Stormblade / skills.lua
--- RB lightning projectile, 1.25x (+25%) attack speed chain, and shieldless handling
+-- RB lightning projectile (scales with Strength), 1.25x (+25%) attack speed chain, and shieldless handling
 -- ==============================================================================
 
 local core = require("Stormblade.core")
 local skills = {}
 
 local FAST_ATTACK, FAST_OTHER = 1.25, 1.15
+local BOLT_CHARGED_SCALING = 2.2 -- Charged Storm Bolt deals 2.2x Strength
+local BOLT_BURST_SCALING = 1.5   -- Combo Burst deals 1.5x Strength
+local BOLT_TAP_SCALING = 1.0     -- Quick Tap deals 1.0x Strength
 local ONSLAUGHT_ACTIONS = {
     Job01_AttackLeft = true,
     Job01_AttackRight = true,
