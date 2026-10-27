@@ -62,6 +62,18 @@ function skills.update_attack_speed()
     end)
 end
 
+--- Ensures weapon is drawn if attempting a skill while sheathed
+function skills.ensure_drawn()
+    local player = core.get_player()
+    if not player or not player:valid() then return false end
+    if player:weapon_drawn() then return true end
+    pcall(function()
+        local ok = player:draw_weapon()
+        if not ok then player:request_action("DrawWeapon", 0) end
+    end)
+    return false
+end
+
 function skills.init()
     install_shield_refusal_hook()
 end
