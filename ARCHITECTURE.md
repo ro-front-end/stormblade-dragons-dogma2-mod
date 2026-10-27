@@ -44,7 +44,7 @@ This document outlines the software design principles, conventions, and architec
       ┌────────▼────────┐           ┌────────▼────────┐
       │   skills.lua    │           │ locomotion.lua  │
       │  RB Storm Bolt  │           │ Speed Multiplier│
-      │ & Action Hooks  │           │   (+12% Move)   │
+      │ & Action Hooks  │           │(1.0 walk/1.04 run)
       └─────────────────┘           └─────────────────┘
 ```
 
@@ -58,9 +58,11 @@ This document outlines the software design principles, conventions, and architec
    * Restores original parameters cleanly when unequipping or deactivating.
 3. **`Stormblade/skills.lua`:**
    * Intercepts `JobSpecialAction` (`RB` / Defend) while no shield is worn.
-   * Spawns lightning projectile (`Magike Sperepelote` shell) with instant tap and charged hold.
+   * Spawns lightning projectile (`Magike Sperepelote` shell) scaled directly from Strength (2.2x charged, 1.5x burst, 1.0x tap) with 450 stagger.
+   * Accelerates basic sword attack chain by 1.25x (+25%).
+   * Includes smart draw buffering when executing skills from a sheathed stance.
 4. **`Stormblade/locomotion.lua`:**
-   * Applies the agile movement multiplier (+12%) to character locomotion without affecting attack animation timelines.
+   * Applies dynamic locomotion scaling: normal walking (1.00x) and +4% running/sprinting (1.04x).
 
 ---
 

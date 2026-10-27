@@ -13,13 +13,14 @@
 
 1. **Bare-Handed Spellcasting (No Shield):**
    * Prescinds from heavy shields. The left palm remains free to channel raw elemental electricity.
-   * `RB` (*JobSpecialAction*) replaces vanilla blocking with **Storm Bolt** / **Charged Lightning**, allowing both quick ranged pokes and charged knockdowns.
+   * `RB` (*JobSpecialAction*) replaces vanilla blocking with **Storm Bolt** / **Charged Lightning**, dealing elemental damage scaled directly from total **Strength** (2.2x charged, 1.5x burst, 1.0x tap) with Thunder penetration and high stagger.
 2. **Duospear Magic Scaling & Lightning Infusion:**
    * Automatically balances physical and magical power ($\text{MagicAttack} = \text{PhysicalAttack}$) with 100% Thunder penetration.
    * Scaled with VSB's native Thunder multipliers (+35% to +50% electrical damage).
-3. **Agility & Flow:**
-   * Light attack combo animation speed scaled to **1.5x**.
-   * Out-of-combat and combat locomotion speed boosted by **+12%** for agile repositioning.
+3. **Agility & Balanced Flow:**
+   * Light attack combo animation speed finely tuned to **1.25x (+25%)**.
+   * Balanced locomotion: **1.00x normal walking** (walk naturally alongside pawns/NPCs) and **1.04x (+4%) running / dashing**.
+   * **Smart Unsheathe Buffering:** Custom skills executed while sheathed automatically draw the blade smoothly.
 4. **Light Armor Wardrobe:**
    * Compatible with Archer, Thief, and Mage garb to preserve the agile visual fantasy.
 
