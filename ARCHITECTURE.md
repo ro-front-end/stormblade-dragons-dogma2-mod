@@ -77,10 +77,11 @@ This document outlines the software design principles, conventions, architectura
 3. **`Stormblade/skills.lua` & `Pactblade.lua` Integration:**
    * **Core Action (`RB`):** Intercepts `JobSpecialAction` while no shield is worn. Casts Storm Bolt with instant tap and charged release, scaled dynamically from `player_strength()` with 450 stagger.
    * **Custom Weapon Slots:** Handled via `processCustomSkill` hook. Dispatches:
-     - `Arc Slash` (`sb_slash`): Horizontal shockwave slashes.
-     - `Tempest Flurry` (`sb_combo`): High-speed blade chain.
-     - `Levin Storm` (`sb_levin`): Targeted vertical lightning strike from heavens.
-     - `Nova Eléctrica` (`sb_nova`): 360° ground shockwave discharge.
+     - `Arc Slash` (`sb_slash`, UUID `...002`): Horizontal shockwave slashes (`Job01_HindsightSlash`).
+     - `Tempest Flurry` (`sb_combo`, UUID `...005`): High-speed blade chain (`Job01_BravesRaid`).
+     - `Levin Storm` (`sb_levin`, UUID `...006`, Phase 2): Targeted vertical lightning strike from heavens.
+     - `Nova Eléctrica` (`sb_nova`, UUID `...007`, Phase 2): 360° ground shockwave discharge.
+   * **Phase 1 Routing Alignment:** Deprecated `sb_bolt` (`...001`), `sb_smite` (`...003`), and `sb_dive` (`...004`) were purged to eliminate duplicate entries and resolve mid-air state stalls (`Job07_SkyDive`).
    * **Sheathe Buffering:** Automatically buffers custom skills executed from a sheathed stance (`bufferUntil = os.clock() + 1.2`), drawing the blade before striking.
 4. **`Stormblade/locomotion.lua`:**
    * Manages character speed rates: normal walking (`1.00x` vanilla parity) and running/sprinting (`1.04x` agile boost).

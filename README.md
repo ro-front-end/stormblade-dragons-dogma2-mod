@@ -45,6 +45,12 @@
 
 Every mechanic in Stormblade was refined iteratively based on extensive in-game testing to ensure maximum stability and balanced gameplay:
 
+* **Phase 1 Complete — Surgical Cleanup & UUID Alignment:**
+  * *Root Cause Solved:* "Thunder Smite" previously leaped and hung indefinitely in mid-air because `sb_smite.json` UUID was mapped to `"dive"` (`Job07_SkyDive`) without a valid target lock. Furthermore, "Storm Bolt" appeared as an unneeded purchasable slot skill in the Vocation Guild despite already being a permanent core mechanic on `RB`.
+  * *Actions Executed:* 
+    * Fully backed up and eliminated `sb_bolt.json`, `sb_smite.json`, and `sb_dive.json` from both project manifests and the game's active VSB directory.
+    * Re-anchored `Pactblade.lua` routing: `sb_slash` (UUID `...002`) accurately triggers `Arc Slash` (Eldritch sword waves via `Job01_HindsightSlash`), and `sb_combo` (UUID `...005`) accurately triggers `Tempest Flurry` (high-speed blade rush via `Job01_BravesRaid`).
+    * Validated Lua AST and local registers: 0 syntax errors, 182/200 locals (18 free slots).
 * **Locomotion Calibration (1.12x ➔ 1.00x walk / 1.04x run):**
   * *Reasoning:* Initial +12% across all movement made walking noticeably desynced from pawns and NPCs. Walking was restored to 1.00x (vanilla) while sprinting received a subtle +4% boost for natural agility.
 * **Attack Chain Speed (1.50x ➔ 1.25x):**
