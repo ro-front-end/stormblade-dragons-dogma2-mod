@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "uuid": "7a31b412-4019-4b21-99ee-b01149e1a003",
+  "id": "sb_ascender",
+  "kind": "custom",
+  "presentation": {
+    "name": {
+      "en": "Storm Ascender"
+    },
+    "desc": {
+      "en": "Leap vertically into the air with an electrifying upward slash, cleaving airborne monsters and soaring into enemy weakpoints."
+    },
+    "icon": 3
+  },
+  "availability": {
+    "mode": "all"
+  },
+  "levels": {
+    "1": {
+      "unlock_rank": 2,
+      "dcp_cost": 400
+    },
+    "2": {
+      "unlock_rank": 6,
+      "dcp_cost": 1600
+    }
+  },
+  "conditions": {
+    "grounded": true,
+    "not_carrying": true,
+    "not_restricted": true
+  },
+  "trigger": {
+    "type": "slot"
+  },
+  "timeline": [
+    {
+      "id": "ascender_action",
+      "type": "action",
+      "frame": 0,
+      "action": "Job01_RisingLunge",
+      "speed": 1.15
+    },
+    {
+      "id": "thunder_buff",
+      "type": "status",
+      "frame": 0,
+      "duration": 4.0,
+      "status": "thunder_boon"
+    },
+    {
+      "id": "ascender_hit",
+      "type": "hit",
+      "frame": 0,
+      "until": 50,
+      "super_armor": true,
+      "element": "Thunder",
+      "attack_rate": 1.35
+    },
+    {
+      "id": "ascender_spark",
+      "type": "shell",
+      "frame": 6,
+      "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
+      "shell_id": 7,
+      "cast": {
+        "mode": "target",
+        "lock_target": "enemy",
+        "lock_range": 25,
+        "face": "crosshair"
+      },
+      "element": "Thunder",
+      "attack_rate": 0.25,
+      "color": [0.2, 0.7, 1.0, 1.0],
+      "enabled": true
+    }
+  ]
+}
