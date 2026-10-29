@@ -5,10 +5,10 @@
   "kind": "custom",
   "presentation": {
     "name": {
-      "en": "Levin Storm"
+      "en": "Thunder Stun"
     },
     "desc": {
-      "en": "Channel celestial fury through your blade and palm, summoning a concentrated pillar of Levin lightning to strike down upon foes from the heavens."
+      "en": "Channel a focused surge of paralyzing lightning from your blade and palm, shocking foes and halting them in their tracks."
     },
     "icon": 35
   },

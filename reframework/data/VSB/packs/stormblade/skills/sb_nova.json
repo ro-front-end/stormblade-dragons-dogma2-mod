@@ -55,7 +55,7 @@
       "until": 60,
       "super_armor": true,
       "element": "Thunder",
-      "attack_rate": 1.5
+      "attack_rate": 1.1
     },
     {
       "id": "nova_burst",
@@ -69,7 +69,7 @@
         "face": "owner"
       },
       "element": "Thunder",
-      "attack_rate": 1.5,
+      "attack_rate": 0.8,
       "damage_type": "Hitback_L",
       "color": [0.2, 0.7, 1.0, 1.0],
       "enabled": true
@@ -87,7 +87,7 @@
         "face": "crosshair"
       },
       "element": "Thunder",
-      "attack_rate": 2.5,
+      "attack_rate": 1.2,
       "damage_type": "Hitback_L",
       "color": [0.2, 0.7, 1.0, 1.0],
       "enabled": true
@@ -105,25 +105,7 @@
         "face": "crosshair"
       },
       "element": "Thunder",
-      "attack_rate": 0.5,
-      "color": [0.2, 0.7, 1.0, 1.0],
-      "enabled": true
-    },
-    {
-      "id": "nova_followup_bolt",
-      "type": "shell",
-      "frame": 8,
-      "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
-      "shell_id": 8,
-      "cast": {
-        "mode": "target",
-        "lock_target": "enemy",
-        "lock_range": 35,
-        "face": "crosshair"
-      },
-      "element": "Thunder",
-      "attack_rate": 1.8,
-      "damage_type": "Hitback_L",
+      "attack_rate": 0.2,
       "color": [0.2, 0.7, 1.0, 1.0],
       "enabled": true
     }
