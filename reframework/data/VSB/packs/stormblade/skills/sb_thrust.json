@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "uuid": "7a31b412-4019-4b21-99ee-b01149e1a001",
+  "id": "sb_thrust",
+  "kind": "custom",
+  "presentation": {
+    "name": {
+      "en": "Lightning Thrust"
+    },
+    "desc": {
+      "en": "Lunge forward in a blinding dash with your blade shrouded in crackling lightning to pierce distant foes."
+    },
+    "icon": 1
+  },
+  "availability": {
+    "mode": "all"
+  },
+  "levels": {
+    "1": {
+      "unlock_rank": 1,
+      "dcp_cost": 0
+    },
+    "2": {
+      "unlock_rank": 4,
+      "dcp_cost": 1000
+    }
+  },
+  "conditions": {
+    "grounded": true,
+    "not_carrying": true,
+    "not_restricted": true
+  },
+  "trigger": {
+    "type": "slot"
+  },
+  "timeline": [
+    {
+      "id": "thrust_action",
+      "type": "action",
+      "frame": 0,
+      "action": "Job01_BlinkStrike",
+      "speed": 1.15
+    },
+    {
+      "id": "thunder_buff",
+      "type": "status",
+      "frame": 0,
+      "duration": 4.0,
+      "status": "thunder_boon"
+    },
+    {
+      "id": "thrust_hit",
+      "type": "hit",
+      "frame": 0,
+      "until": 40,
+      "super_armor": true,
+      "element": "Thunder",
+      "attack_rate": 1.3
+    },
+    {
+      "id": "thrust_spark",
+      "type": "shell",
+      "frame": 4,
+      "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
+      "shell_id": 7,
+      "cast": {
+        "mode": "target",
+        "lock_target": "enemy",
+        "lock_range": 25,
+        "face": "crosshair"
+      },
+      "element": "Thunder",
+      "attack_rate": 0.2,
+      "color": [0.2, 0.7, 1.0, 1.0],
+      "enabled": true
+    }
+  ]
+}
