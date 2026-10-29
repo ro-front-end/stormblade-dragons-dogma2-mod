@@ -30,11 +30,28 @@
   },
   "timeline": [
     {
-      "id": "n1",
-      "type": "script",
+      "id": "cast_anim",
+      "type": "action",
       "frame": 0,
-      "fn": "return true"
+      "action": "MagicBookCastThunder",
+      "speed": 1.2
+    },
+    {
+      "id": "levin_bolt",
+      "type": "shell",
+      "frame": 12,
+      "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
+      "shell_id": 8,
+      "cast": {
+        "mode": "target",
+        "lock_target": "enemy",
+        "lock_range": 35,
+        "face": "crosshair"
+      },
+      "attack_rate": 3,
+      "element": "Thunder",
+      "damage_type": "Hitback_L",
+      "enabled": true
     }
   ]
 }
-
