@@ -8,7 +8,7 @@
       "en": "Nova Eléctrica"
     },
     "desc": {
-      "en": "Discharge a violent 360-degree shockwave of electricity through the earth, electrocuting and repelling surrounding foes."
+      "en": "Discharge a violent 360-degree tempest of lightning through the earth, striking surrounding foes with multiple celestial thunderbolts."
     },
     "icon": 10
   },
@@ -27,7 +27,7 @@
   },
   "costs": {
     "stamina": {
-      "amount": 150,
+      "amount": 160,
       "at_frame": 0
     }
   },
@@ -51,7 +51,7 @@
       "id": "thunder_buff",
       "type": "status",
       "frame": 0,
-      "duration": 3.0,
+      "duration": 4.0,
       "status": "thunder_boon"
     },
     {
@@ -64,19 +64,82 @@
       "attack_rate": 1.5
     },
     {
-      "id": "shockwave_radial",
+      "id": "bolt_center",
       "type": "shell",
       "frame": 8,
       "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
-      "shell_id": 36,
+      "shell_id": 8,
       "cast": {
         "mode": "owner",
-        "offset": [0.0, 0.2, 0.0],
+        "offset": [0.0, 0.0, 0.0],
         "face": "owner"
       },
-      "scale_axes": [2.5, 1.5, 2.5],
       "element": "Thunder",
-      "attack_rate": 2.2,
+      "attack_rate": 1.2,
+      "damage_type": "Hitback_L",
+      "color": [0.2, 0.7, 1.0, 1.0]
+    },
+    {
+      "id": "bolt_front",
+      "type": "shell",
+      "frame": 8,
+      "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
+      "shell_id": 8,
+      "cast": {
+        "mode": "owner",
+        "offset": [0.0, 0.0, 2.5],
+        "face": "owner"
+      },
+      "element": "Thunder",
+      "attack_rate": 1.0,
+      "damage_type": "Hitback_L",
+      "color": [0.2, 0.7, 1.0, 1.0]
+    },
+    {
+      "id": "bolt_back",
+      "type": "shell",
+      "frame": 8,
+      "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
+      "shell_id": 8,
+      "cast": {
+        "mode": "owner",
+        "offset": [0.0, 0.0, -2.5],
+        "face": "owner"
+      },
+      "element": "Thunder",
+      "attack_rate": 1.0,
+      "damage_type": "Hitback_L",
+      "color": [0.2, 0.7, 1.0, 1.0]
+    },
+    {
+      "id": "bolt_right",
+      "type": "shell",
+      "frame": 8,
+      "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
+      "shell_id": 8,
+      "cast": {
+        "mode": "owner",
+        "offset": [2.5, 0.0, 0.0],
+        "face": "owner"
+      },
+      "element": "Thunder",
+      "attack_rate": 1.0,
+      "damage_type": "Hitback_L",
+      "color": [0.2, 0.7, 1.0, 1.0]
+    },
+    {
+      "id": "bolt_left",
+      "type": "shell",
+      "frame": 8,
+      "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
+      "shell_id": 8,
+      "cast": {
+        "mode": "owner",
+        "offset": [-2.5, 0.0, 0.0],
+        "face": "owner"
+      },
+      "element": "Thunder",
+      "attack_rate": 1.0,
       "damage_type": "Hitback_L",
       "color": [0.2, 0.7, 1.0, 1.0]
     }
