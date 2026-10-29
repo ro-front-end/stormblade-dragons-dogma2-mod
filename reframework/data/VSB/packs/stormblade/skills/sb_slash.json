@@ -17,12 +17,12 @@
   },
   "levels": {
     "1": {
-      "unlock_rank": 1,
-      "dcp_cost": 300
-    },
-    "2": {
       "unlock_rank": 3,
       "dcp_cost": 800
+    },
+    "2": {
+      "unlock_rank": 7,
+      "dcp_cost": 2500
     }
   },
   "trigger": {
@@ -37,4 +37,3 @@
     }
   ]
 }
-
