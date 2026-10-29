@@ -8,7 +8,7 @@
       "en": "Levin Storm"
     },
     "desc": {
-      "en": "Raise your blade to the heavens, channeling celestial fury to strike the target with a concentrated pillar of lightning."
+      "en": "Channel celestial fury through your blade and palm, summoning a concentrated pillar of Levin lightning to strike down upon foes from the heavens."
     },
     "icon": 35
   },
@@ -33,20 +33,28 @@
       "id": "cast_anim",
       "type": "action",
       "frame": 0,
-      "action": "Job01_ShieldSummons",
-      "speed": 1.3
+      "action": "Job07_MagicBindComplete",
+      "speed": 1.2
     },
     {
       "id": "thunder_buff",
       "type": "status",
       "frame": 0,
       "duration": 4.0,
-      "status": "thunder_boon"
+      "status": "thunder_boon",
+      "target": "self"
+    },
+    {
+      "id": "cast_armor",
+      "type": "hit",
+      "frame": 0,
+      "until": 30,
+      "super_armor": true
     },
     {
       "id": "levin_bolt",
       "type": "shell",
-      "frame": 8,
+      "frame": 10,
       "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
       "shell_id": 8,
       "cast": {
@@ -64,7 +72,7 @@
     {
       "id": "levin_flash",
       "type": "shell",
-      "frame": 8,
+      "frame": 10,
       "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
       "shell_id": 7,
       "cast": {
