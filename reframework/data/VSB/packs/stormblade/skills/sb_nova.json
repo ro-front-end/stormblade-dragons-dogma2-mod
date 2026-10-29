@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "uuid": "7a31b412-4019-4b21-99ee-b01149e1a007",
+  "id": "sb_nova",
+  "kind": "custom",
+  "presentation": {
+    "name": {
+      "en": "Nova Eléctrica"
+    },
+    "desc": {
+      "en": "Discharge a violent 360-degree shockwave of electricity through the earth, electrocuting and repelling surrounding foes."
+    },
+    "icon": 10
+  },
+  "availability": {
+    "mode": "all"
+  },
+  "levels": {
+    "1": {
+      "unlock_rank": 4,
+      "dcp_cost": 1200
+    },
+    "2": {
+      "unlock_rank": 8,
+      "dcp_cost": 3200
+    }
+  },
+  "trigger": {
+    "type": "slot"
+  },
+  "timeline": [
+    {
+      "id": "n1",
+      "type": "script",
+      "frame": 0,
+      "fn": "return true"
+    }
+  ]
+}
