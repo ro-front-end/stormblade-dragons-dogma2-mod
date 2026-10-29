@@ -45,6 +45,8 @@
 
 Every mechanic in Stormblade was refined iteratively based on extensive in-game testing to ensure maximum stability and balanced gameplay:
 
+* **Phase 2 Complete — Declarative VSB Manifests (Levin Storm & Nova Eléctrica):**
+  * *Reasoning:* Expanded the spellsword loadout with two distinct, grounded lightning techniques. Built and deployed `sb_levin.json` (UUID `...006`, Rank 3/7) and `sb_nova.json` (UUID `...007`, Rank 4/8) adhering strictly to VSB Schema v1. Synchronized directly into the game's active VSB pack directory and integrated into `Pactblade.lua` custom routing.
 * **Phase 1 Complete — Surgical Cleanup & UUID Alignment:**
   * *Root Cause Solved:* "Thunder Smite" previously leaped and hung indefinitely in mid-air because `sb_smite.json` UUID was mapped to `"dive"` (`Job07_SkyDive`) without a valid target lock. Furthermore, "Storm Bolt" appeared as an unneeded purchasable slot skill in the Vocation Guild despite already being a permanent core mechanic on `RB`.
   * *Actions Executed:* 
