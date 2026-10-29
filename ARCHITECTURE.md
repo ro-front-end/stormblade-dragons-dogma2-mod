@@ -79,8 +79,9 @@ This document outlines the software design principles, conventions, architectura
    * **Custom Weapon Slots:** Handled via `processCustomSkill` hook. Dispatches:
      - `Arc Slash` (`sb_slash`, UUID `...002`): Horizontal shockwave slashes (`Job01_HindsightSlash`).
      - `Tempest Flurry` (`sb_combo`, UUID `...005`): High-speed blade chain (`Job01_BravesRaid`).
-     - `Levin Storm` (`sb_levin`, UUID `...006`): Targeted vertical lightning strike from heavens (`Job01_RisingLunge` cast anchor).
-     - `Nova Eléctrica` (`sb_nova`, UUID `...007`): 360° ground shockwave discharge (`Job01_FullMoonSlash` cast anchor).
+     - `Levin Storm` (`sb_levin`, UUID `...006`): Targeted vertical lightning strike from heavens (`Job01_RisingLunge` cast anchor, 2.8x Strength, 550 stagger).
+     - `Nova Eléctrica` (`sb_nova`, UUID `...007`): 360° ground shockwave discharge (`Job01_FullMoonSlash` cast anchor, 2.0x Strength, 400 stagger).
+   * **Runtime Shell & Scaling Engine (Phase 3):** Dedicated IIFE executor handling target raycasting (`aim_pick`), shell spawning (`HumanShellParamData_JobMagic.user` shells 8 & 36), electric blue tinting (`colour_shell`), and physical-to-magick damage injection in `calcDamageValue`.
    * **Declarative Schema Alignment (Phase 2):** VSB manifests deployed under `reframework/data/VSB/packs/stormblade/skills/` with unlock ranks (Levin: 3/7, Nova: 4/8) and mapped into `Pactblade.lua` routing.
    * **Phase 1 Routing Alignment:** Deprecated `sb_bolt` (`...001`), `sb_smite` (`...003`), and `sb_dive` (`...004`) were purged to eliminate duplicate entries and resolve mid-air state stalls (`Job07_SkyDive`).
    * **Sheathe Buffering:** Automatically buffers custom skills executed from a sheathed stance (`bufferUntil = os.clock() + 1.2`), drawing the blade before striking.

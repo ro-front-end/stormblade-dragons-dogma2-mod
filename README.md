@@ -45,6 +45,10 @@
 
 Every mechanic in Stormblade was refined iteratively based on extensive in-game testing to ensure maximum stability and balanced gameplay:
 
+* **Phase 3 Complete — Levin Storm & Nova Eléctrica Shell Engine & Strength Scaling:**
+  * *Reasoning:* Programmed the runtime execution pipelines in `Pactblade.lua` using IIFE isolation (preserving the 182/200 locals ceiling).
+    - **Levin Storm:** Intercepts `Job01_RisingLunge`, acquires target via camera/stick raycast (`aim_pick`), and calls down `Thunder Rain` (Shell 8, `HumanShellParamData_JobMagic.user`) tinted in electric blue (`colour_shell`). Inflicts 2.8x total Strength with 550 heavy stagger.
+    - **Nova Eléctrica:** Intercepts `Job01_FullMoonSlash`, unleashing a 360° ground shockwave (`Burst Shot`, Shell 36) at player feet. Inflicts 2.0x total Strength with 400 knockdown reaction.
 * **Phase 2 Complete — Declarative VSB Manifests (Levin Storm & Nova Eléctrica):**
   * *Reasoning:* Expanded the spellsword loadout with two distinct, grounded lightning techniques. Built and deployed `sb_levin.json` (UUID `...006`, Rank 3/7) and `sb_nova.json` (UUID `...007`, Rank 4/8) adhering strictly to VSB Schema v1. Synchronized directly into the game's active VSB pack directory and integrated into `Pactblade.lua` custom routing.
 * **Phase 1 Complete — Surgical Cleanup & UUID Alignment:**
