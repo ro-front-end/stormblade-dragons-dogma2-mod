@@ -12,111 +12,48 @@
 ## 🗡️ Core Concept & Gameplay Pillars
 
 1. **Bare-Handed Spellcasting (No Shield):**
-   * Prescinds entirely from heavy shields. The left palm remains free to channel raw elemental electricity.
-   * `RB` (*JobSpecialAction*) replaces vanilla blocking with **Storm Bolt** / **Charged Lightning**, dealing elemental damage scaled directly from total **Strength** (2.2x charged, 1.5x burst, 1.0x tap) with Thunder penetration and high stagger (450 reaction).
+   * Prescinds entirely from heavy shields. The left hand remains free to channel agile evasions and lightning magic.
+   * `RB` (*JobSpecialAction*) executes **`Lightning Step`**: a pure, ultra-fast directional quickstep/dodge with electric sparks, replacing vanilla blocking with zero animation lock or stance freezes.
 2. **Duospear Magic Scaling & Lightning Infusion:**
    * Automatically balances physical and magical power ($\text{MagicAttack} = \text{PhysicalAttack}$) with 100% Thunder penetration (`_Element = 3`).
-   * Scaled with VSB's native Thunder multipliers (+35% to +50% electrical damage).
+   * Scaled with VSB's balanced Thunder multiplier (+15% electrical damage).
 3. **Agility & Balanced Flow:**
-   * Light attack combo animation speed finely tuned to **1.25x (+25%)** (secondary finishers at 1.15x).
+   * Light attack combo animation speed tuned to **1.30x (+30%)** (secondary finishers at 1.20x).
    * Balanced locomotion: **1.00x normal walking** (walk naturally alongside pawns and NPCs) and **1.04x (+4%) running / sprinting**.
    * **Smart Unsheathe Buffering:** Custom skills executed while sheathed automatically draw the blade smoothly before striking.
-4. **Curated Spellsword Repertoire (No Dead Shield Skills):**
-   * Vanilla shield skills (*Shield Bash*, *Shield Pummel*, *Launchboard*, *Shield Summons*) are cleanly removed from the Vocation Guild.
-   * Replaced by 4 synergistic combat and storm magick skills.
+4. **Curated Spellsword Repertoire (Full 6-Skill Loadout):**
+   * Vanilla shield skills (*Shield Bash*, *Shield Pummel*, *Launchboard*, *Shield Summons*) are cleanly removed/hidden from the Vocation Guild.
+   * Features a cohesive 6-skill repertoire spanning from Rank 1 to Rank 6.
 5. **Light Armor Wardrobe:**
    * Compatible with Archer, Thief, and Mage garb to preserve the agile visual fantasy.
 
 ---
 
-## ⚡ Complete Skill Loadout (4 Active Slots + 1 Core)
+## ⚡ Complete Skill Loadout (6 Official Skills + 1 Core Evasion)
 
-| Skill Name | Type | Key Mechanics & Synergy |
-| :--- | :--- | :--- |
-| **Storm Bolt** | **Core (`RB`)** | **Off-hand lightning bolt.** Free, permanent core mechanic (not occupying weapon slots). Tap for quick projectile; hold to charge a piercing thunderbolt with 450 stagger. Scales 2.2x with total Strength. |
-| **Arc Slash** (*Eldritch Slash*) | **Weapon Slot 1** | **Sword wave slashes.** Triple horizontal blade slashes that release electric crescent waves to cleave through multiple foes at medium range. |
-| **Tempest Flurry** (*Archfey Combo*) | **Weapon Slot 2** | **High-speed blade rush.** Continuous lightning-fast sword combo with blue afterimages, perfect for punishing staggered enemies. |
-| **Levin Storm** (*Relámpago Celestial*) | **Weapon Slot 3** | **Vertical lightning strike.** Calls down an electric thunderbolt from the heavens onto the focused target with explosive impact and high knockdown. |
-| **Nova Eléctrica** (*Radial Shockwave*) | **Weapon Slot 4** | **360° Ground discharge.** Expels a circular radial shockwave along the terrain, electrifying and throwing back surrounding smaller enemies. |
+| Rank | Skill Name | Base Animation | Key Mechanics & Synergy |
+| :--- | :--- | :--- | :--- |
+| **Core** | **Lightning Step** | Evasive Quickstep | **Pure directional dodge on `RB`.** Instant repositioning with electric sparks, zero projectile delay, and no stance lock. |
+| **Rank 1** | **Lightning Thrust** | `Job01_BlinkStrike` | **High-speed gap closer.** Blinding dash forward at ground level with crackling lightning on the blade tip. Ideal combat opener. |
+| **Rank 2** | **Storm Ascender** | `Job01_RisingLunge` | **Vertical leap slash.** Soaring upward cut enveloped in thunder sparks. Perfect for hunting flying harpies and striking giant monster weakpoints. |
+| **Rank 3** | **Arc Slash** | `sb_slash.json` | **Sword wave slashes.** Horizontal blade slashes that release electric crescent shockwaves to cleave through foes at medium range. |
+| **Rank 4** | **Tempest Flurry** | `Job07_DanceOfDeath` | **Continuous blade flurry.** Unstoppable terrestrial flurry (Wild Furie) with lightning-enchanted slashes and super armor. Tested and confirmed on bosses. |
+| **Rank 5** | **Thunder Stun** | `Job07_MagicBindComplete` + Shell 8 | **Paralyzing palm discharge.** Extends the left palm and unleashes a concentrated lightning surge that halts and stuns enemies in their tracks. |
+| **Rank 6** | **Thunder Fall** | `Job01_ViolentStabStart` + Shell 8/12 | **Catastrophic dive finisher.** Leap forward and impale the blade deep into the earth; on ground impact, summons a celestial Levin thunderbolt and radial shockwave. |
 
 ---
 
 ## ⚖️ Design Evolution & Decision Log
 
-Every mechanic in Stormblade was refined iteratively based on extensive in-game testing to ensure maximum stability and balanced gameplay:
-
-* **Phase 3 Complete — Levin Storm & Nova Eléctrica Shell Engine & Strength Scaling:**
-  * *Reasoning:* Programmed the runtime execution pipelines in `Pactblade.lua` using IIFE isolation (preserving the 182/200 locals ceiling).
-    - **Levin Storm:** Intercepts `Job01_RisingLunge`, acquires target via camera/stick raycast (`aim_pick`), and calls down `Thunder Rain` (Shell 8, `HumanShellParamData_JobMagic.user`) tinted in electric blue (`colour_shell`). Inflicts 2.8x total Strength with 550 heavy stagger.
-    - **Nova Eléctrica:** Intercepts `Job01_FullMoonSlash`, unleashing a 360° ground shockwave (`Burst Shot`, Shell 36) at player feet. Inflicts 2.0x total Strength with 400 knockdown reaction.
-* **Phase 2 Complete — Declarative VSB Manifests (Levin Storm & Nova Eléctrica):**
-  * *Reasoning:* Expanded the spellsword loadout with two distinct, grounded lightning techniques. Built and deployed `sb_levin.json` (UUID `...006`, Rank 3/7) and `sb_nova.json` (UUID `...007`, Rank 4/8) adhering strictly to VSB Schema v1. Synchronized directly into the game's active VSB pack directory and integrated into `Pactblade.lua` custom routing.
-* **Phase 1 Complete — Surgical Cleanup & UUID Alignment:**
-  * *Root Cause Solved:* "Thunder Smite" previously leaped and hung indefinitely in mid-air because `sb_smite.json` UUID was mapped to `"dive"` (`Job07_SkyDive`) without a valid target lock. Furthermore, "Storm Bolt" appeared as an unneeded purchasable slot skill in the Vocation Guild despite already being a permanent core mechanic on `RB`.
-  * *Actions Executed:* 
-    * Fully backed up and eliminated `sb_bolt.json`, `sb_smite.json`, and `sb_dive.json` from both project manifests and the game's active VSB directory.
-    * Re-anchored `Pactblade.lua` routing: `sb_slash` (UUID `...002`) accurately triggers `Arc Slash` (Eldritch sword waves via `Job01_HindsightSlash`), and `sb_combo` (UUID `...005`) accurately triggers `Tempest Flurry` (high-speed blade rush via `Job01_BravesRaid`).
-    * Validated Lua AST and local registers: 0 syntax errors, 182/200 locals (18 free slots).
-* **Locomotion Calibration (1.12x ➔ 1.00x walk / 1.04x run):**
-  * *Reasoning:* Initial +12% across all movement made walking noticeably desynced from pawns and NPCs. Walking was restored to 1.00x (vanilla) while sprinting received a subtle +4% boost for natural agility.
-* **Attack Chain Speed (1.50x ➔ 1.25x):**
-  * *Reasoning:* 1.50x felt overly rushed and disjointed. 1.25x (+25%) preserves satisfying visual clarity while maintaining a swift tempo.
-* **Storm Bolt Damage Overhaul:**
-  * *Reasoning:* Vanilla Mystic Spearhand bolt has 0 base damage in DD2 (pure CC). The initial mod scaled off character base magick, causing 0 damage for Fighter vocations. We engineered a dynamic `player_strength()` resolver (sword + base attack) converting full physical power into Thunder magick damage.
+* **V2 Architecture Complete (6 Skills & Agility Polish):**
+  * Configured `Lightning Step` on `RB` for fluid, non-blocking mobility.
+  * Increased melee combat attack speed to **+30% (1.30x)**.
+  * Rebalanced vocation stat bonus to **+15% Thunder damage** to ensure tight, non-overpowered combat pacing.
+  * Deployed `Thunder Fall` (Rank 6 finisher) and retired unstable radial Nova.
+* **Phase 3 Complete — Levin Stun & Tempest Flurry Stabilization:**
+  * Replaced book/shield animations with native Mystic Spearhand palm cast for `Thunder Stun`.
+  * Transitioned `Tempest Flurry` to native VSB Wild Furie (`Job07_DanceOfDeath`), verified in active combat against bosses.
+* **Locomotion Calibration (1.00x walk / 1.04x run):**
+  * Preserved natural walking cadence alongside pawns while granting an agile sprinting boost.
 * **Smart Unsheathe Buffering:**
-  * *Reasoning:* Executing skills from a sheathed stance previously caused unarmed animation desyncs. Added an automated unsheathe state check with a 1.2s action buffer.
-* **Lua 200 Local Variable Constraint Fix:**
-  * *Reasoning:* Sol3/Lua engine enforces a hard limit of 200 local variables per chunk. The base mod sat at 199 locals; adding new features pushed it to 201, crashing REFramework with `too many local variables in main function`. Solved by encapsulating globals and constants into a unified `PB.*` namespace, dropping active locals to 182 (18 free safety buffer).
-* **Deprecating Aerial SkyDive (Smite):**
-  * *Reasoning:* The airborne dive skill frequently stalled in mid-air when target tracking desynced. Replaced with grounded, 100% reliable skills: **Levin Storm** and **Nova Eléctrica**.
-* **Eliminating Guild Duplicates & Shield Skills:**
-  * *Reasoning:* Storm Bolt was duplicated in both `RB` and the Guild menu; shield skills were dead weight. Filtered the Guild manifest to expose only genuine sword and lightning skills.
-* **Hardware & Thermal Stability (Laptop RTX 5050):**
-  * *Reasoning:* Long multi-hour sessions caused GPU TDR driver crashes (`nvlddmkm.sys` / `DXGI_ERROR_DEVICE_REMOVED`). Disabled failing `FaultyFileDetector` hooks and tuned graphics recommendations (Effect Quality, Frame Gen, Mesh) to prevent VRAM overflow.
-
----
-
-## 🛠️ Tech Stack & Architecture
-
-* **Lua 5.4 / LuaJIT (REFramework runtime):** Game engine hooks, IL2CPP address resolution, FSM manipulation, and runtime stat patching.
-* **JSON (VSB Schema v1):** Declarative vocation registration, stat tables, and skill progression.
-* **Architecture Pattern:** Decoupled Modular Architecture (Thin entry-point, separated domain services for Weapons, Input, and Locomotion).
-
----
-
-## 📂 Repository Structure
-
-```text
-stormblade/
-├── .gitignore
-├── README.md                 # Project vision, roadmap, and design decision log
-├── ARCHITECTURE.md           # Engineering guidelines, DRY principles, and REFramework hooks
-├── reframework/
-│   ├── autorun/
-│   │   ├── Stormblade.lua    # Thin entry point & lifecycle hooks
-│   │   └── Stormblade/       # Modular domain services
-│   │       ├── core.lua      # State manager & VSB detection
-│   │       ├── weapons.lua   # ItemWeaponParam patcher & Thunder scaling
-│   │       ├── locomotion.lua# Character speed multiplier (1.00x / 1.04x)
-│   │       └── skills.lua    # RB storm bolt & skill adapter
-│   └── data/
-│       └── VSB/
-│           └── packs/
-│               └── stormblade/
-│                   ├── pack.json    # VSB Vocation Schema
-│                   └── skills/      # Custom skill declarations
-│                       ├── sb_slash.json  # Arc Slash
-│                       ├── sb_combo.json  # Tempest Flurry
-│                       ├── sb_levin.json  # Levin Storm
-│                       └── sb_nova.json   # Nova Eléctrica
-```
-
----
-
-## 📦 Requirements
-
-* [Dragon's Dogma 2](https://store.steampowered.com/app/2054970/Dragons_Dogma_2/) (Latest Steam Version)
-* [REFramework](https://github.com/praydog/REFramework) by praydog
-* [_DragonCore](https://www.nexusmods.com/dragonsdogma2/mods/1916) (v1.2.6+) by Bloodragon
-* [Vocation & Skill Builder (VSB)](https://www.nexusmods.com/dragonsdogma2/mods/1917) (v1.5.0+) by Bloodragon
-* [Fluffy Mod Manager](https://www.nexusmods.com/dragonsdogma2/mods/1) (Recommended)
+  * Automated unsheathe state check with a 1.2s action buffer to prevent stance desynchronization.
