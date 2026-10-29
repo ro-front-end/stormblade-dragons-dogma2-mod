@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "uuid": "7a31b412-4019-4b21-99ee-b01149e1a007",
+  "id": "sb_fall",
+  "kind": "custom",
+  "presentation": {
+    "name": {
+      "en": "Thunder Fall"
+    },
+    "desc": {
+      "en": "Leap forward and plunge your blade into the earth with divine force, summoning a catastrophic celestial thunderbolt that shatters the ground."
+    },
+    "icon": 10
+  },
+  "availability": {
+    "mode": "all"
+  },
+  "levels": {
+    "1": {
+      "unlock_rank": 6,
+      "dcp_cost": 2500
+    },
+    "2": {
+      "unlock_rank": 9,
+      "dcp_cost": 5000
+    }
+  },
+  "conditions": {
+    "grounded": true,
+    "not_carrying": true,
+    "not_restricted": true
+  },
+  "trigger": {
+    "type": "slot"
+  },
+  "timeline": [
+    {
+      "id": "turn_target",
+      "type": "move",
+      "frame": 0,
+      "turn": "enemy",
+      "turn_speed": 4.0,
+      "enemy_range": 15.0
+    },
+    {
+      "id": "fall_action",
+      "type": "action",
+      "frame": 0,
+      "action": "Job01_ViolentStabStart",
+      "speed": 1.15
+    },
+    {
+      "id": "thunder_buff",
+      "type": "status",
+      "frame": 0,
+      "duration": 4.0,
+      "status": "thunder_boon"
+    },
+    {
+      "id": "fall_hit",
+      "type": "hit",
+      "frame": 0,
+      "until": 45,
+      "super_armor": true,
+      "element": "Thunder",
+      "attack_rate": 1.4,
+      "damage_type": "Hitback_L"
+    },
+    {
+      "id": "fall_levin",
+      "type": "shell",
+      "frame": 14,
+      "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
+      "shell_id": 8,
+      "cast": {
+        "mode": "target",
+        "lock_target": "enemy",
+        "lock_range": 30,
+        "face": "crosshair"
+      },
+      "element": "Thunder",
+      "attack_rate": 1.6,
+      "damage_type": "Hitback_L",
+      "color": [0.2, 0.7, 1.0, 1.0],
+      "enabled": true
+    },
+    {
+      "id": "fall_burst",
+      "type": "shell",
+      "frame": 14,
+      "shell": "AppSystem/Shell/UserData/HumanShellParamData_Job07.user",
+      "shell_id": 12,
+      "cast": {
+        "mode": "owner",
+        "offset": [0.0, 0.2, 0.0],
+        "face": "owner"
+      },
+      "element": "Thunder",
+      "attack_rate": 0.8,
+      "damage_type": "Hitback_L",
+      "color": [0.2, 0.7, 1.0, 1.0],
+      "enabled": true
+    }
+  ]
+}
