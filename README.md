@@ -5,24 +5,62 @@
 [![Framework: VSB](https://img.shields.io/badge/Framework-VSB%201.5%2B-green)](https://www.nexusmods.com/dragonsdogma2/mods/1917)
 [![Core: DragonCore](https://img.shields.io/badge/Dependency-_DragonCore-red)](https://www.nexusmods.com/dragonsdogma2/mods/1916)
 
-**Stormblade** is a custom hybrid vocation for *Dragon's Dogma 2*, engineered with modularity and software design best practices. It reimagines the sword archetype into a high-speed, lightning-infused **Mage-Knight**: wielding a single-handed blade without a shield, casting lightning bolts from the off-hand, and donning agile armor.
+**Stormblade** is a custom hybrid vocation for *Dragon's Dogma 2*, engineered with modularity, balance, and software design best practices. It reimagines the sword archetype into a high-speed, lightning-infused **Storm Mage-Knight**: wielding a single-handed blade without a shield, casting lightning spells and bolts from the off-hand, and donning agile armor.
 
 ---
 
 ## 🗡️ Core Concept & Gameplay Pillars
 
 1. **Bare-Handed Spellcasting (No Shield):**
-   * Prescinds from heavy shields. The left palm remains free to channel raw elemental electricity.
-   * `RB` (*JobSpecialAction*) replaces vanilla blocking with **Storm Bolt** / **Charged Lightning**, dealing elemental damage scaled directly from total **Strength** (2.2x charged, 1.5x burst, 1.0x tap) with Thunder penetration and high stagger.
+   * Prescinds entirely from heavy shields. The left palm remains free to channel raw elemental electricity.
+   * `RB` (*JobSpecialAction*) replaces vanilla blocking with **Storm Bolt** / **Charged Lightning**, dealing elemental damage scaled directly from total **Strength** (2.2x charged, 1.5x burst, 1.0x tap) with Thunder penetration and high stagger (450 reaction).
 2. **Duospear Magic Scaling & Lightning Infusion:**
-   * Automatically balances physical and magical power ($\text{MagicAttack} = \text{PhysicalAttack}$) with 100% Thunder penetration.
+   * Automatically balances physical and magical power ($\text{MagicAttack} = \text{PhysicalAttack}$) with 100% Thunder penetration (`_Element = 3`).
    * Scaled with VSB's native Thunder multipliers (+35% to +50% electrical damage).
 3. **Agility & Balanced Flow:**
-   * Light attack combo animation speed finely tuned to **1.25x (+25%)**.
-   * Balanced locomotion: **1.00x normal walking** (walk naturally alongside pawns/NPCs) and **1.04x (+4%) running / dashing**.
-   * **Smart Unsheathe Buffering:** Custom skills executed while sheathed automatically draw the blade smoothly.
-4. **Light Armor Wardrobe:**
+   * Light attack combo animation speed finely tuned to **1.25x (+25%)** (secondary finishers at 1.15x).
+   * Balanced locomotion: **1.00x normal walking** (walk naturally alongside pawns and NPCs) and **1.04x (+4%) running / sprinting**.
+   * **Smart Unsheathe Buffering:** Custom skills executed while sheathed automatically draw the blade smoothly before striking.
+4. **Curated Spellsword Repertoire (No Dead Shield Skills):**
+   * Vanilla shield skills (*Shield Bash*, *Shield Pummel*, *Launchboard*, *Shield Summons*) are cleanly removed from the Vocation Guild.
+   * Replaced by 4 synergistic combat and storm magick skills.
+5. **Light Armor Wardrobe:**
    * Compatible with Archer, Thief, and Mage garb to preserve the agile visual fantasy.
+
+---
+
+## ⚡ Complete Skill Loadout (4 Active Slots + 1 Core)
+
+| Skill Name | Type | Key Mechanics & Synergy |
+| :--- | :--- | :--- |
+| **Storm Bolt** | **Core (`RB`)** | **Off-hand lightning bolt.** Free, permanent core mechanic (not occupying weapon slots). Tap for quick projectile; hold to charge a piercing thunderbolt with 450 stagger. Scales 2.2x with total Strength. |
+| **Arc Slash** (*Eldritch Slash*) | **Weapon Slot 1** | **Sword wave slashes.** Triple horizontal blade slashes that release electric crescent waves to cleave through multiple foes at medium range. |
+| **Tempest Flurry** (*Archfey Combo*) | **Weapon Slot 2** | **High-speed blade rush.** Continuous lightning-fast sword combo with blue afterimages, perfect for punishing staggered enemies. |
+| **Levin Storm** (*Relámpago Celestial*) | **Weapon Slot 3** | **Vertical lightning strike.** Calls down an electric thunderbolt from the heavens onto the focused target with explosive impact and high knockdown. |
+| **Nova Eléctrica** (*Radial Shockwave*) | **Weapon Slot 4** | **360° Ground discharge.** Expels a circular radial shockwave along the terrain, electrifying and throwing back surrounding smaller enemies. |
+
+---
+
+## ⚖️ Design Evolution & Decision Log
+
+Every mechanic in Stormblade was refined iteratively based on extensive in-game testing to ensure maximum stability and balanced gameplay:
+
+* **Locomotion Calibration (1.12x ➔ 1.00x walk / 1.04x run):**
+  * *Reasoning:* Initial +12% across all movement made walking noticeably desynced from pawns and NPCs. Walking was restored to 1.00x (vanilla) while sprinting received a subtle +4% boost for natural agility.
+* **Attack Chain Speed (1.50x ➔ 1.25x):**
+  * *Reasoning:* 1.50x felt overly rushed and disjointed. 1.25x (+25%) preserves satisfying visual clarity while maintaining a swift tempo.
+* **Storm Bolt Damage Overhaul:**
+  * *Reasoning:* Vanilla Mystic Spearhand bolt has 0 base damage in DD2 (pure CC). The initial mod scaled off character base magick, causing 0 damage for Fighter vocations. We engineered a dynamic `player_strength()` resolver (sword + base attack) converting full physical power into Thunder magick damage.
+* **Smart Unsheathe Buffering:**
+  * *Reasoning:* Executing skills from a sheathed stance previously caused unarmed animation desyncs. Added an automated unsheathe state check with a 1.2s action buffer.
+* **Lua 200 Local Variable Constraint Fix:**
+  * *Reasoning:* Sol3/Lua engine enforces a hard limit of 200 local variables per chunk. The base mod sat at 199 locals; adding new features pushed it to 201, crashing REFramework with `too many local variables in main function`. Solved by encapsulating globals and constants into a unified `PB.*` namespace, dropping active locals to 182 (18 free safety buffer).
+* **Deprecating Aerial SkyDive (Smite):**
+  * *Reasoning:* The airborne dive skill frequently stalled in mid-air when target tracking desynced. Replaced with grounded, 100% reliable skills: **Levin Storm** and **Nova Eléctrica**.
+* **Eliminating Guild Duplicates & Shield Skills:**
+  * *Reasoning:* Storm Bolt was duplicated in both `RB` and the Guild menu; shield skills were dead weight. Filtered the Guild manifest to expose only genuine sword and lightning skills.
+* **Hardware & Thermal Stability (Laptop RTX 5050):**
+  * *Reasoning:* Long multi-hour sessions caused GPU TDR driver crashes (`nvlddmkm.sys` / `DXGI_ERROR_DEVICE_REMOVED`). Disabled failing `FaultyFileDetector` hooks and tuned graphics recommendations (Effect Quality, Frame Gen, Mesh) to prevent VRAM overflow.
 
 ---
 
@@ -34,34 +72,12 @@
 
 ---
 
-## ⚡ Skill Architecture (3 Sections)
-
-| Section | Role | Key Mechanics |
-| :--- | :--- | :--- |
-| **1. Core Skills (Núcleo)** | Foundational Mechanics | • **Storm Bolt (`RB`):** Instant discharge (tap) or high-impact bolt (hold).<br>• **Storm Step:** Agile dodge / evasion.<br>• **Bare-handed Stance:** Shieldless posture and 1.5x light attack chains. |
-| **2. Weapon Skills (Ranura)** | Active Equippable Skills | • **Lightning Rush:** Instant forward dash with electrical trail.<br>• **Thunderfall Slash:** High-velocity airborne dive and shockwave.<br>• **Arc Slash:** Mid-range cleaving electrical projectile.<br>• **Storm Flurry:** Multi-hit electric combo. |
-| **3. Infusions & Buffs (Parámetros)** | Passive Scaling & Boons | • **Thunder Boon:** Permanent native weapon enchantment with sparks and SFX.<br>• **Duospear Weapon Bridge:** Automatic $\text{Magic} = \text{Strength}$ parity. |
-
----
-
-## 🗺️ Project Roadmap & Implementation Plan
-
-- [x] **Phase 0:** Research & Architecture Design (VSB + REFramework lifecycle analysis).
-- [x] **Phase 1:** Project foundation, folder layout, `.gitignore`, and Git documentation.
-- [x] **Phase 2:** VSB Pack declaration (`pack.json`) and registration in REFramework picks.
-- [x] **Phase 3:** Weapon service implementation (`weapons.lua` with Duospear Thunder scaling).
-- [x] **Phase 4:** Input & Combat service (`skills.lua` with off-hand lightning on `RB`).
-- [x] **Phase 5:** Locomotion & Agility module (`locomotion.lua` with +12% speed).
-- [ ] **Phase 6:** In-game validation & refinement.
-
----
-
 ## 📂 Repository Structure
 
 ```text
 stormblade/
 ├── .gitignore
-├── README.md                 # Project vision, roadmap, and tech documentation
+├── README.md                 # Project vision, roadmap, and design decision log
 ├── ARCHITECTURE.md           # Engineering guidelines, DRY principles, and REFramework hooks
 ├── reframework/
 │   ├── autorun/
@@ -69,7 +85,7 @@ stormblade/
 │   │   └── Stormblade/       # Modular domain services
 │   │       ├── core.lua      # State manager & VSB detection
 │   │       ├── weapons.lua   # ItemWeaponParam patcher & Thunder scaling
-│   │       ├── locomotion.lua# Character speed multiplier
+│   │       ├── locomotion.lua# Character speed multiplier (1.00x / 1.04x)
 │   │       └── skills.lua    # RB storm bolt & skill adapter
 │   └── data/
 │       └── VSB/
@@ -77,6 +93,10 @@ stormblade/
 │               └── stormblade/
 │                   ├── pack.json    # VSB Vocation Schema
 │                   └── skills/      # Custom skill declarations
+│                       ├── sb_slash.json  # Arc Slash
+│                       ├── sb_combo.json  # Tempest Flurry
+│                       ├── sb_levin.json  # Levin Storm
+│                       └── sb_nova.json   # Nova Eléctrica
 ```
 
 ---
