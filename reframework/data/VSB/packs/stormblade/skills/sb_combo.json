@@ -8,7 +8,7 @@
       "en": "Tempest Flurry"
     },
     "desc": {
-      "en": "A tempest of rapid strikes: vanish and strike in quick succession."
+      "en": "Unleash a relentless tempest of lightning-infused slashes, surging forward with unstoppable kinetic force."
     },
     "icon": 9
   },
@@ -17,24 +17,59 @@
   },
   "levels": {
     "1": {
-      "unlock_rank": 6,
-      "dcp_cost": 2000
+      "unlock_rank": 4,
+      "dcp_cost": 1200
     },
     "2": {
-      "unlock_rank": 9,
-      "dcp_cost": 4000
+      "unlock_rank": 7,
+      "dcp_cost": 2500
     }
+  },
+  "costs": {
+    "stamina": {
+      "amount": 160,
+      "at_frame": 0
+    }
+  },
+  "conditions": {
+    "grounded": true,
+    "not_carrying": true,
+    "not_restricted": true
   },
   "trigger": {
     "type": "slot"
   },
   "timeline": [
     {
-      "id": "n1",
-      "type": "script",
+      "id": "turn_target",
+      "type": "move",
       "frame": 0,
-      "fn": "return true"
+      "turn": "enemy",
+      "turn_speed": 4.0,
+      "enemy_range": 12.0
+    },
+    {
+      "id": "action_flurry",
+      "type": "action",
+      "frame": 0,
+      "action": "Job07_DanceOfDeath",
+      "speed": 1.2
+    },
+    {
+      "id": "thunder_enchant",
+      "type": "status",
+      "frame": 0,
+      "duration": 3.5,
+      "status": "thunder_boon"
+    },
+    {
+      "id": "hit_property",
+      "type": "hit",
+      "frame": 0,
+      "until": 120,
+      "super_armor": true,
+      "element": "Thunder",
+      "attack_rate": 1.35
     }
   ]
 }
-
