@@ -25,16 +25,60 @@
       "dcp_cost": 3200
     }
   },
+  "costs": {
+    "stamina": {
+      "amount": 150,
+      "at_frame": 0
+    }
+  },
+  "conditions": {
+    "grounded": true,
+    "not_carrying": true,
+    "not_restricted": true
+  },
   "trigger": {
     "type": "slot"
   },
   "timeline": [
     {
-      "id": "n1",
-      "type": "script",
+      "id": "spin_action",
+      "type": "action",
       "frame": 0,
-      "fn": "return true"
+      "action": "Job01_FullMoonSlash",
+      "speed": 1.2
+    },
+    {
+      "id": "thunder_buff",
+      "type": "status",
+      "frame": 0,
+      "duration": 3.0,
+      "status": "thunder_boon"
+    },
+    {
+      "id": "spin_hit",
+      "type": "hit",
+      "frame": 0,
+      "until": 60,
+      "super_armor": true,
+      "element": "Thunder",
+      "attack_rate": 1.5
+    },
+    {
+      "id": "shockwave_radial",
+      "type": "shell",
+      "frame": 8,
+      "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
+      "shell_id": 36,
+      "cast": {
+        "mode": "owner",
+        "offset": [0.0, 0.2, 0.0],
+        "face": "owner"
+      },
+      "scale_axes": [2.5, 1.5, 2.5],
+      "element": "Thunder",
+      "attack_rate": 2.2,
+      "damage_type": "Hitback_L",
+      "color": [0.2, 0.7, 1.0, 1.0]
     }
   ]
 }
-
