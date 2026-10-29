@@ -1,7 +1,7 @@
 {
     "author": "Stormblade Team",
     "description": {
-        "en": "A lightning-infused swordsman: a high-speed, magick-charged blade and storm bolts from the off hand. Built on VSB."
+        "en": "A lightning-infused swordsman: a high-speed, magick-charged blade with electric steps and storm arts. Prescinds from shields."
     },
     "id": "stormblade",
     "load_order": 100,
@@ -25,15 +25,15 @@
         },
         "stats": {
             "damage": 5.0,
-            "defence": 0.0,
+            "defence": 5.0,
             "element_damage": {
-                "Thunder": 35.0
+                "Thunder": 15.0
             },
             "element_resist": {
-                "Thunder": 40.0
+                "Thunder": 25.0
             },
-            "stagger_resist": 10.0,
-            "stamina_cost": 5.0
+            "stagger_resist": 15.0,
+            "stamina_cost": -10.0
         },
         "unlock": {
             "price": 0
@@ -43,4 +43,3 @@
     },
     "vsb_min_version": "0.1.0"
 }
-
