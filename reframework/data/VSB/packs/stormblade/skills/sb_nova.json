@@ -25,12 +25,6 @@
       "dcp_cost": 3200
     }
   },
-  "costs": {
-    "stamina": {
-      "amount": 160,
-      "at_frame": 0
-    }
-  },
   "conditions": {
     "grounded": true,
     "not_carrying": true,
@@ -66,7 +60,7 @@
     {
       "id": "nova_burst",
       "type": "shell",
-      "frame": 6,
+      "frame": 2,
       "shell": "AppSystem/Shell/UserData/HumanShellParamData_Job07.user",
       "shell_id": 12,
       "cast": {
@@ -83,7 +77,7 @@
     {
       "id": "nova_levin_strike",
       "type": "shell",
-      "frame": 6,
+      "frame": 2,
       "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
       "shell_id": 8,
       "cast": {
@@ -101,7 +95,7 @@
     {
       "id": "nova_flash",
       "type": "shell",
-      "frame": 6,
+      "frame": 2,
       "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
       "shell_id": 7,
       "cast": {
@@ -118,7 +112,7 @@
     {
       "id": "nova_followup_bolt",
       "type": "shell",
-      "frame": 14,
+      "frame": 8,
       "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
       "shell_id": 8,
       "cast": {
