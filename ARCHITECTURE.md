@@ -97,3 +97,17 @@ This document outlines the software design principles, conventions, architectura
 * **REFramework Lifecycle Hooks:**
   * `re.on_frame(fn)`: Executes state checks throttled to avoid per-frame CPU overhead.
   * `re.on_script_reset(fn)`: Ensures all weapon parameters, active buffs, and hooks restore cleanly to vanilla state upon script reset.
+
+---
+
+## 5. Key Challenges & Iterative Solutions
+
+Throughout development, technical constraints and gameplay edge-cases emerged that required iterative engineering. Rather than settling for fragile workarounds, we tested multiple alternatives to ensure maximum stability and polish:
+
+| Challenge | Initial Symptom / Alternative Explored | Final Iterative Solution |
+| :--- | :--- | :--- |
+| **Lua 200-Locals Limit** | Script exceeded 200 file-scope locals (`LUAI_MAXVARS`), crashing REFramework on load (`too many local variables`). | **Namespace Table Packing (`PB.*`):** Packed constants, state flags, and helpers into a centralized table, dropping locals to 182 and establishing a safe 18-variable buffer. |
+| **Storm Bolt 0-Damage** | Spearhand bolt has 0 base damage in DD2 (pure CC). Initial test scaled from base Magick, leaving Fighter stats doing 0 damage. | **Physical-to-Lightning Scaling:** Dynamically resolves `player_strength()` (sword + base attack), scaling bolt damage (2.2x charged, 1.5x burst) with full Thunder element penetration. |
+| **Aerial Freezes & Target Desync** | "Thunder Smite" mapped to `Job07_SkyDive` locked character floating in mid-air when camera/lock-on desynced without a target. | **Pivoting to Grounded Spells:** Abandoned fragile aerial dive physics in favor of 100% reliable grounded spells: **Levin Storm** (celestial vertical strike) and **Nova Eléctrica** (radial ground discharge). |
+| **Sheathed Input Drops** | Pressing weapon skills while sword was sheathed caused animation glitching or failed casts. | **Auto-Draw & Input Buffering:** Implemented `ensure_drawn()` with a 1.2s input action buffer, allowing smooth unsheathing straight into the skill execution. |
+| **Laptop GPU TDR / Startup Deadlocks** | Multi-hour sessions on RTX 5050 Laptop GPU triggered Windows TDR resets (`DXGI_ERROR_DEVICE_REMOVED`) and startup thread hangs. | **Hook Optimization & Guardrails:** Disabled failing `FaultyFileDetector` hook in REFramework config, bounded active VFX lifetimes, and established recommended graphics profiles to eliminate VRAM exhaustion. |
