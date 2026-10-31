@@ -12,11 +12,12 @@
 ## 🗡️ Core Concept & Gameplay Pillars
 
 1. **Bare-Handed Spellcasting (No Shield):**
-   * Prescinds entirely from heavy shields. The left hand remains free to channel agile evasions and lightning magic.
+   * Prescinds entirely from heavy shields. The left hand remains free to channel agile evasions, palm strikes, and lightning magic.
    * `RB` (*JobSpecialAction*) executes **`Lightning Step`**: a pure, ultra-fast directional quickstep/dodge with electric sparks, replacing vanilla blocking with zero animation lock or stance freezes.
+   * `Triangle` / `Y` / `R-Click` (*Heavy Attack*) executes **`Thunderstrike`**: replaces the vanilla sword heavy attack with a fast, off-hand palm thrust unleashing an electric shockwave with mild pushback (`Hitback_S`) and hybrid 2.2x Strength scaling.
 2. **Duospear Magic Scaling & Lightning Infusion:**
-   * Automatically balances physical and magical power ($\text{MagicAttack} = \text{PhysicalAttack}$) with 100% Thunder penetration (`_Element = 3`).
-   * Scaled with VSB's balanced Thunder multiplier (+15% electrical damage).
+   * Automatically balances physical and magical power with 100% Thunder penetration (`_Element = 3`).
+   * Scaled with VSB's calibrated Thunder multiplier (+1.5% electrical growth per rank) and balanced weapon split (70% physical / 45% magick).
 3. **Agility & Balanced Flow:**
    * Light attack combo animation speed tuned to **1.30x (+30%)** (secondary finishers at 1.20x).
    * Balanced locomotion: **1.00x normal walking** (walk naturally alongside pawns and NPCs) and **1.04x (+4%) running / sprinting**.
@@ -29,11 +30,12 @@
 
 ---
 
-## ⚡ Complete Skill Loadout (6 Official Skills + 1 Core Evasion)
+## ⚡ Complete Skill Loadout (6 Official Skills + 2 Core Mechanics)
 
 | Rank | Skill Name | Base Animation | Key Mechanics & Synergy |
 | :--- | :--- | :--- | :--- |
 | **Core** | **Lightning Step** | Evasive Quickstep | **Pure directional dodge on `RB`.** Instant repositioning with electric sparks, zero projectile delay, and no stance lock. |
+| **Core** | **Thunderstrike** | `Job07_MagicBindComplete` + Shell 12 | **Off-hand heavy attack (`Triangle` / `Y` / `R-Click`).** Replaces sword heavy attack with a swift, forward left-palm strike that unleashes an electric shockwave (`Hitback_S`) with 2.2x strength hybrid damage. |
 | **Rank 1** | **Lightning Thrust** | `Job01_BlinkStrike` | **High-speed gap closer.** Blinding dash forward at ground level with crackling lightning on the blade tip. Ideal combat opener. |
 | **Rank 2** | **Storm Ascender** | `Job01_RisingLunge` | **Vertical leap slash.** Soaring upward cut enveloped in thunder sparks. Perfect for hunting flying harpies and striking giant monster weakpoints. |
 | **Rank 3** | **Arc Slash** | `sb_slash.json` | **Sword wave slashes.** Horizontal blade slashes that release electric crescent shockwaves to cleave through foes at medium range. |
@@ -47,8 +49,9 @@
 
 * **V2 Architecture Complete (6 Skills & Agility Polish):**
   * Configured `Lightning Step` on `RB` for fluid, non-blocking mobility.
+  * Configured `Thunderstrike` on `Triangle` / `Y` for off-hand magical utility.
   * Increased melee combat attack speed to **+30% (1.30x)**.
-  * Rebalanced vocation stat bonus to **+15% Thunder damage** to ensure tight, non-overpowered combat pacing.
+  * Rebalanced weapon scaling and stat compounding to maintain fair combat pacing.
   * Deployed `Thunder Fall` (Rank 6 finisher) and retired unstable radial Nova.
 * **Phase 3 Complete — Levin Stun & Tempest Flurry Stabilization:**
   * Replaced book/shield animations with native Mystic Spearhand palm cast for `Thunder Stun`.
