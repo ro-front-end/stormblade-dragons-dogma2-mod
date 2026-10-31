@@ -44,8 +44,26 @@ local function refresh_character_equipment(itemId)
     end)
 end
 
+local function ensure_thunder_boon()
+    local player = core.get_player()
+    if not player or not player:valid() or not player.character then return end
+    pcall(function()
+        local statuses = require("DragonCore.game.statuses")
+        if not statuses.active(player.character, "thunder_boon") then
+            statuses.apply(player.character, "thunder_boon")
+        end
+    end)
+end
+
 --- Restores any modified weapon stats back to vanilla
 function weapons.restore()
+    pcall(function()
+        local player = core.get_player()
+        if player and player:valid() and player.character then
+            local statuses = require("DragonCore.game.statuses")
+            statuses.cure(player.character, "thunder_boon")
+        end
+    end)
     if not backup then return end
     pcall(function()
         if backup.param then
@@ -78,6 +96,7 @@ function weapons.update()
 
     -- If weapon is already modified and still matches, verify parameters haven't reset
     if backup and backup.id == weapon_id then
+        ensure_thunder_boon()
         pcall(function()
             local p = backup.param
             if p._MagicAttack ~= p._PhysicalAttack or p._Element ~= THUNDER_ELEMENT then
@@ -114,6 +133,7 @@ function weapons.update()
     param._ElementStore = FULL_STORE
 
     refresh_character_equipment(backup.itemId)
+    ensure_thunder_boon()
 end
 
 return weapons

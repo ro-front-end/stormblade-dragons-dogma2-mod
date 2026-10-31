@@ -64,10 +64,11 @@
       "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
       "shell_id": 7,
       "cast": {
-        "mode": "target",
+        "mode": "owner",
+        "offset": [0.0, 1.2, 0.8],
+        "face": "owner",
         "lock_target": "enemy",
-        "lock_range": 25,
-        "face": "crosshair"
+        "lock_range": 15.0
       },
       "element": "Thunder",
       "attack_rate": 0.25,
