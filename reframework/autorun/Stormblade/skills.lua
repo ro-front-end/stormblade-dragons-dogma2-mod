@@ -79,6 +79,20 @@ function skills.ensure_drawn()
     return false
 end
 
+--- Ensures Stormblade core skills (Tusk Toss charged slash) are active from Rank 1
+function skills.update_core_skills()
+    if not core.is_active() then return end
+    local player = core.get_player()
+    if not player or not player:valid() or not player.character then return end
+    pcall(function()
+        local human = player.character:get_Human()
+        local ctx = human and human["<SkillContext>k__BackingField"]
+        if ctx then
+            ctx:call("setNormalSkillEnable(app.HumanNormalSkillID)", 6)
+        end
+    end)
+end
+
 function skills.init()
     install_shield_refusal_hook()
 end

@@ -23,6 +23,7 @@ re.on_frame(function()
         core.update()
         weapons.update()
         locomotion.update()
+        skills.update_core_skills()
     end
 
     -- Attack speed must be evaluated on active frames

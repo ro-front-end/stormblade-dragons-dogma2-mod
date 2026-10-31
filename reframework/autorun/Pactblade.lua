@@ -545,8 +545,8 @@ end)
 ------------------------------------------------------------------------
 -- Fighter kit changes while Pactblade is active
 ------------------------------------------------------------------------
--- core skills: Thief's Controlled Fall + Footpad on; Fighter's shield core skills off (player only)
-local GRANT = { [17] = true, [18] = true, [27] = true }          -- Job04_BreakFall, Job04_KickWall, Job07 Quik Fot
+-- core skills: Tusk Toss (charged attack) + Thief's Controlled Fall + Footpad on; Fighter's shield core skills off (player only)
+local GRANT = { [6] = true, [17] = true, [18] = true, [27] = true }          -- Job01_TuskToss (Charged Slash), Job04_BreakFall, Job04_KickWall, Job07 Quik Fot
 local DENY = { [4] = true, [5] = true, [7] = true, [8] = true }  -- Deflect, True Deflect, Steeled Foundation, Enchanted Counter
 for _, spec in ipairs({ { "app.HumanSkillContext", "isNormalSkillEnable(app.HumanNormalSkillID)", "ctx" },
                         { "app.PlayerInputProcessorDetail", "isNormalSkillEnable(app.HumanNormalSkillID)", nil },
@@ -1603,11 +1603,10 @@ update_body = function()
             local cc = a.character:call("get_CatchController")
             if cc then
                 if cc:get_field("CaughtChara") or cc:get_field("CaughtObject") or cc:get_field("CatchObject") then carrying = true end
-                if (cc.isCatch and cc:isCatch()) or (cc.isHold and cc:isHold()) then carrying = true end
             end
             local hc = a.character:call("get_HoldController")
             if hc then
-                if hc:get_field("HoldObject") or (hc.isHold and hc:isHold()) then carrying = true end
+                if hc:get_field("HoldObject") then carrying = true end
             end
         end)
     end
