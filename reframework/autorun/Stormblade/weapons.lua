@@ -1,6 +1,7 @@
 -- ==============================================================================
 -- Stormblade / weapons.lua
--- Duospear formula: Scales sword MagicAttack = PhysicalAttack + Thunder infusion
+-- Spellsword Hybrid Scaling: 70% Physical Attack + 45% Magick Attack + Thunder
+-- Balanced against dual defense checks, matching Fighter & Warrior damage output
 -- ==============================================================================
 
 local core = require("Stormblade.core")
@@ -9,8 +10,12 @@ local weapons = {}
 local THUNDER_ELEMENT = 3
 local FULL_STORE = 100
 
+-- Balanced Ratios: 70% physical + 45% magick = 115% combined base power
+local PHYS_RATIO = 0.70
+local MAG_RATIO = 0.45
+
 -- Active sword backup to guarantee clean restore
-local backup = nil -- { param, id, itemId, original_mag, original_el, original_store, own }
+local backup = nil -- { param, id, itemId, original_phys, original_mag, original_el, original_store, own }
 
 local function get_item_manager()
     return sdk.get_managed_singleton("app.ItemManager")
@@ -67,11 +72,13 @@ function weapons.restore()
     if not backup then return end
     pcall(function()
         if backup.param then
+            backup.param._PhysicalAttack = backup.original_phys
             backup.param._MagicAttack = backup.original_mag
             backup.param._Element = backup.original_el
             backup.param._ElementStore = backup.original_store
         end
         if backup.own and backup.own.obj then
+            backup.own.obj._PhysicalAttack = backup.own.phys
             backup.own.obj._MagicAttack = backup.own.mag
             backup.own.obj._Element = backup.own.el
             backup.own.obj._ElementStore = backup.own.store
@@ -81,7 +88,7 @@ function weapons.restore()
     backup = nil
 end
 
---- Applies Duospear Thunder scaling to the currently held sword
+--- Applies Spellblade Thunder scaling to the currently held sword
 function weapons.update()
     if not core.is_active() then
         if backup then weapons.restore() end
@@ -94,13 +101,18 @@ function weapons.update()
         return
     end
 
+    -- Target values based on original weapon stats
+    local target_phys = backup and math.max(1, math.floor(backup.original_phys * PHYS_RATIO)) or nil
+    local target_mag = backup and math.max(1, math.floor(backup.original_phys * MAG_RATIO)) or nil
+
     -- If weapon is already modified and still matches, verify parameters haven't reset
     if backup and backup.id == weapon_id then
         ensure_thunder_boon()
         pcall(function()
             local p = backup.param
-            if p._MagicAttack ~= p._PhysicalAttack or p._Element ~= THUNDER_ELEMENT then
-                p._MagicAttack = p._PhysicalAttack
+            if p._PhysicalAttack ~= target_phys or p._MagicAttack ~= target_mag or p._Element ~= THUNDER_ELEMENT then
+                p._PhysicalAttack = target_phys
+                p._MagicAttack = target_mag
                 p._Element = THUNDER_ELEMENT
                 p._ElementStore = FULL_STORE
                 refresh_character_equipment(backup.itemId)
@@ -122,13 +134,15 @@ function weapons.update()
         param = param:add_ref(),
         id = weapon_id,
         itemId = param._Id,
+        original_phys = param._PhysicalAttack,
         original_mag = param._MagicAttack,
         original_el = param._Element,
         original_store = param._ElementStore,
     }
 
-    -- Apply Duospear formula: Magic Attack = Physical Attack, Element = Thunder
-    param._MagicAttack = param._PhysicalAttack
+    -- Apply balanced Spellblade formula: 70% Physical, 45% Magick, Element = Thunder
+    param._PhysicalAttack = math.max(1, math.floor(backup.original_phys * PHYS_RATIO))
+    param._MagicAttack = math.max(1, math.floor(backup.original_phys * MAG_RATIO))
     param._Element = THUNDER_ELEMENT
     param._ElementStore = FULL_STORE
 
@@ -137,4 +151,3 @@ function weapons.update()
 end
 
 return weapons
-
