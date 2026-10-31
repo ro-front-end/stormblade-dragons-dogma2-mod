@@ -26,10 +26,9 @@ re.on_frame(function()
         skills.update_core_skills()
     end
 
-    -- Active frame evaluations: attack speed and off-hand Thunderstrike timing
+    -- Attack speed must be evaluated on active frames
     if core.is_active() then
         skills.update_attack_speed()
-        skills.update_thunderstrike()
     end
 end)
 

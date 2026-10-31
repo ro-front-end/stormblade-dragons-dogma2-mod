@@ -535,6 +535,18 @@ pcall(function()
         "requestActionCore(app.ActionManager.Priority, System.String, System.UInt32)"), function(args)
         if not live.on or not live.am or sdk.to_int64(args[2]) ~= live.am then return end
         local ok, name = pcall(function() return sdk.to_managed_object(args[4]):call("ToString()") end)
+        if ok and name and PB.activeVocation == "stormblade" and (name:find("HeavyAttack") or name:find("ViolentStabStart")) then
+            local a = runtime.player()
+            if a and a:valid() and not PB.in_thunderstrike then
+                PB.in_thunderstrike = true
+                a:request_action("Job07_MagicBindComplete", 0)
+                PB.thunderstrike_active = true
+                PB.thunderstrike_t0 = os.clock()
+                PB.thunderstrike_spawned = false
+                PB.in_thunderstrike = false
+                return sdk.PreHookResult.SKIP_ORIGINAL
+            end
+        end
         if ok and name and name:find("^Job01_") and (name:find("Guard") or name:find("Shield")) then
             dbg.blocked = dbg.blocked + 1
             return sdk.PreHookResult.SKIP_ORIGINAL
@@ -5133,6 +5145,34 @@ end)()
         local a = runtime.player()
         if not a or not a:valid() then return end
         local now = os.clock()
+        -- Thunderstrike off-hand palm burst
+        if PB.thunderstrike_active then
+            local elapsed = now - (PB.thunderstrike_t0 or now)
+            if not PB.thunderstrike_spawned and elapsed >= 0.20 then
+                PB.thunderstrike_spawned = true
+                PB.thunderstrikeT = now
+                local shell_node = {
+                    type = "shell",
+                    id = "sb_thunderstrike",
+                    shell = PB.JOB07_SHELLS or "AppSystem/Shell/UserData/HumanShellParamData_Job07.user",
+                    shell_id = 12,
+                    cast = { mode = "joint", joint = "L_Hand_Palm", face = "owner" },
+                    element = "Thunder",
+                    damage_type = "Hitback_S",
+                    attack_rate = 2.2,
+                    color = { 50, 180, 255, 255 },
+                    scale = 1.0
+                }
+                local res, err = spawn(a, shell_node, nil)
+                if res and res.record then
+                    colour_shell(res.record, { 0.20, 0.70, 1.0, 1.0 }, 4.0, true)
+                    note("Stormblade: Thunderstrike unleashed!")
+                end
+            end
+            if elapsed >= 0.70 then
+                PB.thunderstrike_active = false
+            end
+        end
 
         -- Maintain native Thunder Boon crackling electricity on the sword
         if a.character and a:weapon_drawn() then
