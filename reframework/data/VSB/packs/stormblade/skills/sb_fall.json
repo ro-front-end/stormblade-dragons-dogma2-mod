@@ -69,7 +69,7 @@
     {
       "id": "fall_flash",
       "type": "shell",
-      "frame": 24,
+      "frame": 18,
       "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
       "shell_id": 7,
       "cast": {
@@ -77,15 +77,53 @@
         "offset": [0.0, 0.0, 1.4],
         "face": "owner",
         "lock_target": "enemy",
-        "lock_range": 15.0
+        "lock_range": 5.0
       },
       "element": "Thunder",
       "attack_rate": 0.5,
-      "color": [0.2, 0.7, 1.0, 1.0],
+      "color": [50, 180, 255, 255],
       "enabled": true
     },
     {
       "id": "fall_bolt",
+      "type": "shell",
+      "frame": 20,
+      "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
+      "shell_id": 8,
+      "cast": {
+        "mode": "owner",
+        "offset": [0.0, 0.0, 1.4],
+        "face": "owner",
+        "lock_target": "enemy",
+        "lock_range": 5.0
+      },
+      "element": "Thunder",
+      "attack_rate": 1.8,
+      "damage_type": "Hitback_L",
+      "color": [50, 180, 255, 255],
+      "enabled": true
+    },
+    {
+      "id": "fall_pursuit",
+      "type": "shell",
+      "frame": 24,
+      "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
+      "shell_id": 9,
+      "cast": {
+        "mode": "owner",
+        "offset": [0.0, 0.0, 1.4],
+        "face": "owner",
+        "lock_target": "enemy",
+        "lock_range": 5.0
+      },
+      "element": "Thunder",
+      "attack_rate": 1.4,
+      "damage_type": "Hitback_L",
+      "color": [50, 180, 255, 255],
+      "enabled": true
+    },
+    {
+      "id": "fall_bolt2",
       "type": "shell",
       "frame": 28,
       "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
@@ -95,50 +133,12 @@
         "offset": [0.0, 0.0, 1.4],
         "face": "owner",
         "lock_target": "enemy",
-        "lock_range": 15.0
-      },
-      "element": "Thunder",
-      "attack_rate": 1.8,
-      "damage_type": "Hitback_L",
-      "color": [0.2, 0.7, 1.0, 1.0],
-      "enabled": true
-    },
-    {
-      "id": "fall_pursuit",
-      "type": "shell",
-      "frame": 32,
-      "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
-      "shell_id": 9,
-      "cast": {
-        "mode": "owner",
-        "offset": [0.0, 0.0, 1.4],
-        "face": "owner",
-        "lock_target": "enemy",
-        "lock_range": 15.0
-      },
-      "element": "Thunder",
-      "attack_rate": 1.4,
-      "damage_type": "Hitback_L",
-      "color": [0.2, 0.7, 1.0, 1.0],
-      "enabled": true
-    },
-    {
-      "id": "fall_bolt2",
-      "type": "shell",
-      "frame": 36,
-      "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
-      "shell_id": 8,
-      "cast": {
-        "mode": "owner",
-        "offset": [0.0, 0.0, 1.4],
-        "face": "owner",
-        "lock_target": "enemy",
-        "lock_range": 15.0
+        "lock_range": 5.0
       },
       "element": "Thunder",
       "attack_rate": 1.2,
       "damage_type": "Hitback_L",
-      "color": [0.2, 0.7, 1.0, 1.0],
+      "color": [50, 180, 255, 255],
       "enabled": true
     }
   ]
