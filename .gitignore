@@ -36,3 +36,8 @@ Pactblade_*.json
 .env
 .env.*
 !.env.example
+
+# Internal Development Workflow (Ignored by Git per User Request)
+DEV_WORKFLOW_PROTOCOL.md
+workflow_protocol.md
+
