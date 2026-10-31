@@ -927,6 +927,7 @@ function colour_shell(record, c, secs, everyFrame)
     -- wave); otherwise 5x a second and the found containers are kept coloured
     table.insert(colourJobs, { record = record, col = via_colour(c), untilT = os.clock() + secs, every = everyFrame, born = os.clock() })
 end
+PB.colour_shell = colour_shell
 local function shell_alive(record)
     local alive = false
     for _, part in ipairs(record.parts or {}) do
@@ -3216,7 +3217,8 @@ pcall(function()
                 end)
             end
             if not s.pbKind and PB.activeVocation == "stormblade" then
-                if PB.levinT and os.clock() - PB.levinT < 3.5 then s.pbKind = "levin"
+                if PB.thunderstrikeT and os.clock() - PB.thunderstrikeT < 2.0 then s.pbKind = "thunderstrike"
+                elseif PB.levinT and os.clock() - PB.levinT < 3.5 then s.pbKind = "levin"
                 elseif PB.novaT and os.clock() - PB.novaT < 2.5 then s.pbKind = "nova" end
             end
             if combo.stage == 4 and not combo.finalHit then combo.finalHit = true; note("final strike hit") end
@@ -3274,9 +3276,9 @@ pcall(function()
                 end)
                 row.enchant = info.EnchantDamage
                 row.elemental = info.NonMagicElementDamage
-                if PB.activeVocation == "stormblade" and (kind == "charged" or kind == "tap" or kind == "burst" or kind == "bind" or kind == "levin" or kind == "nova") then
+                if PB.activeVocation == "stormblade" and (kind == "charged" or kind == "tap" or kind == "burst" or kind == "bind" or kind == "levin" or kind == "nova" or kind == "thunderstrike") then
                     local str = PB.player_strength()
-                    local mul = (kind == "levin" and 2.8) or (kind == "nova" and 2.0) or (kind == "charged" and 2.2) or (kind == "burst" and 1.5) or 1.0
+                    local mul = (kind == "levin" and 2.8) or (kind == "thunderstrike" and 2.2) or (kind == "nova" and 2.0) or (kind == "charged" and 2.2) or (kind == "burst" and 1.5) or 1.0
                     local dmg = str * mul * (info.DamageRate or 1)
                     info.Damage = dmg
                     pcall(function() info.IsMagicAttack = true end)
@@ -3285,10 +3287,10 @@ pcall(function()
                     pcall(function() info.NonMagicElementDamage = dmg end)
                     pcall(function() info.SlashDamage = 0; info.ShootDamage = 0; info.StrikeDamage = 0 end)
                     pcall(function() info.DamageType = 6; info.DamageActType = 6; info.IsDirectDamageEnableAllDamageType = true end)
-                    pcall(function() info.DamageReaction = (kind == "charged" and 450) or 250 end)
+                    pcall(function() info.DamageReaction = (kind == "thunderstrike" and 350) or (kind == "charged" and 450) or 250 end)
                     pcall(function() info:call("set_ElementType", 3) end)
                     pcall(function() if info["<AttackUserData>k__BackingField"] then info["<AttackUserData>k__BackingField"]:set_field("_ElementType", 3) end end)
-                    row.kind = (kind == "levin" and "Levin Storm") or (kind == "nova" and "Nova Eléctrica") or ("Storm Bolt (" .. tostring(kind) .. ")")
+                    row.kind = (kind == "thunderstrike" and "Thunderstrike") or (kind == "levin" and "Levin Storm") or (kind == "nova" and "Nova Eléctrica") or ("Storm Bolt (" .. tostring(kind) .. ")")
                     dbg.boltMag = str
                     note(("Stormblade %s hit: %.0f lightning damage (strength %.0f x%.1f)"):format(row.kind, dmg, str, mul))
                 elseif kind == "bind" then

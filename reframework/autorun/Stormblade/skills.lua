@@ -31,6 +31,7 @@ local HEAVY_ATTACKS = {
 
 local heavy_hook_installed = false
 local in_thunderstrike_request = false
+local thunderstrike_state = { active = false, start_time = 0, spawned = false }
 
 local function install_heavy_attack_hook()
     if heavy_hook_installed then return end
@@ -52,12 +53,60 @@ local function install_heavy_attack_hook()
                 if ok and name and (HEAVY_ATTACKS[name] or (name:find("^Job01_") and name:find("HeavyAttack"))) then
                     in_thunderstrike_request = true
                     player:request_action("Job07_MagicBindComplete", 0)
+                    thunderstrike_state.active = true
+                    thunderstrike_state.start_time = os.clock()
+                    thunderstrike_state.spawned = false
                     in_thunderstrike_request = false
                     return sdk.PreHookResult.SKIP_ORIGINAL
                 end
             end, function(r) return r end)
         end
     end)
+end
+
+--- Updates Thunderstrike timing and spawns electric palm burst shell
+function skills.update_thunderstrike()
+    if not core.is_active() or not thunderstrike_state.active then return end
+    local player = core.get_player()
+    if not player or not player:valid() then
+        thunderstrike_state.active = false
+        return
+    end
+
+    local elapsed = os.clock() - thunderstrike_state.start_time
+
+    if not thunderstrike_state.spawned and elapsed >= 0.20 then
+        thunderstrike_state.spawned = true
+        pcall(function()
+            local PB = rawget(_G, "PB")
+            if PB then PB.thunderstrikeT = os.clock() end
+
+            local shell_node = {
+                type = "shell",
+                id = "sb_thunderstrike",
+                shell = (PB and PB.JOB07_SHELLS) or "AppSystem/Shell/UserData/HumanShellParamData_Job07.user",
+                shell_id = 12,
+                cast = {
+                    mode = "joint",
+                    joint = "L_Hand_Palm",
+                    face = "owner"
+                },
+                element = "Thunder",
+                damage_type = "Hitback_S",
+                attack_rate = 2.2,
+                color = { 50, 180, 255, 255 },
+                scale = 1.0
+            }
+            local res, err = player:spawn_shell(shell_node, nil)
+            if res and res.record and PB and PB.colour_shell then
+                PB.colour_shell(res.record, { 0.20, 0.70, 1.0, 1.0 }, 4.0, true)
+            end
+        end)
+    end
+
+    if elapsed >= 0.70 then
+        thunderstrike_state.active = false
+    end
 end
 
 -- Prevent equipping shields while active

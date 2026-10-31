@@ -26,9 +26,10 @@ re.on_frame(function()
         skills.update_core_skills()
     end
 
-    -- Attack speed must be evaluated on active frames
+    -- Active frame evaluations: attack speed and off-hand Thunderstrike timing
     if core.is_active() then
         skills.update_attack_speed()
+        skills.update_thunderstrike()
     end
 end)
 
@@ -43,16 +44,16 @@ end)
 re.on_draw_ui(function()
     if imgui.tree_node("Stormblade Vocation") then
         local active = core.is_active()
+        imgui.text_colored(active and "Status: ACTIVE" or "Status: INACTIVE", active and 0xFF00FF00 or 0xFF888888)
         if active then
-            imgui.text_colored("Status: ACTIVE (Lightning Infused)", 0xFF40C0FF)
+            imgui.text("Weapon: Sword wielded (Job01)")
+            imgui.text("Shield: Refused (Empty Off-Hand)")
+            imgui.text("Attack Speed: +30% Chain")
+            imgui.text("Dodge: Lightning Step (RB)")
+            imgui.text("Heavy Attack: Thunderstrike (Off-Hand Palm)")
         else
-            imgui.text_colored("Status: INACTIVE (Pick 'Stormblade' in VSB)", 0xFF808080)
-        end
-
-        if active and core.has_shield() then
-            imgui.text_colored("Warning: Prescinds from shields. Unequip your shield for full agility.", 0xFF5050FF)
+            imgui.text("Equip a sword and pick Stormblade in VSB to activate.")
         end
         imgui.tree_pop()
     end
 end)
-
