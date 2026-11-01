@@ -3284,7 +3284,7 @@ pcall(function()
                 row.elemental = info.NonMagicElementDamage
                 if PB.activeVocation == "stormblade" and (kind == "charged" or kind == "tap" or kind == "burst" or kind == "bind" or kind == "levin" or kind == "nova" or kind == "thunderstrike" or kind == "javelin") then
                     local str = PB.player_strength()
-                    local mul = (kind == "javelin" and 1.35) or (kind == "thunderstrike" and 0.60) or (kind == "levin" and 3.2) or (kind == "nova" and 2.0) or (kind == "charged" and 2.2) or (kind == "burst" and 1.5) or 1.0
+                    local mul = (kind == "javelin" and 1.85) or (kind == "thunderstrike" and 0.60) or (kind == "levin" and 3.2) or (kind == "nova" and 2.0) or (kind == "charged" and 2.2) or (kind == "burst" and 1.5) or 1.0
                     local rate = (kind == "thunderstrike" or kind == "javelin") and 1.0 or (info.DamageRate or 1)
                     local dmg = math.floor(str * mul * rate)
                     info.Damage = dmg
@@ -3295,25 +3295,36 @@ pcall(function()
                     pcall(function() info.SlashDamage = 0; info.ShootDamage = 0; info.StrikeDamage = 0 end)
                     if kind == "javelin" then
                         pcall(function()
-                            info.DamageType = 7                     -- Hitback_L (grounded heavy knockdown)
-                            info.DamageActType = 2                  -- Down / Stagger (NOT Blown / Yeet into stratosphere)
-                            info.OverwriteBlownType = 7
-                            info.DamageReaction = 200               -- Firm knockdown, stays in front of player
+                            info.DamageType = 6                     -- Hitback_M (clean flinch impact, NO stun / NO knockdown)
+                            info.DamageActType = 1                  -- Flinch (NOT Down / Stun)
+                            info.OverwriteBlownType = 6
+                            info.DamageReaction = 120               -- Moderate flinch stagger
                             info.BlownReactionRate = 0
                             info.BlownReactionConvertLevel = 0
                             info.IsTwoRankUpReaction = false
                             info.ForceFactor = 0
-                            info.HitBackZ = math.min(info.HitBackZ or 0, 2.0)
-                            info.HitBackY = 0                       -- Grounded, no vertical lift!
+                            info.HitBackZ = math.min(info.HitBackZ or 0, 1.2)
+                            info.HitBackY = 0                       -- Grounded, no lift!
                             info.HitBackAddZ = 0
                             info.HitBackVec = Vector3f.new(0, 0, 0)
                         end)
                         pcall(function()
                             local victim = info["<DamageGameObject>k__BackingField"]
                             if victim then
-                                local cc = victim:call("getComponent(System.Type)", sdk.typeof("via.physics.CharacterController"))
-                                if cc then pcall(function() cc:call("set_Velocity", Vector3f.new(0, 0, 0)) end) end
-                                if sm and sm.mark_dead then sm.mark_dead(info) end
+                                local ch = victim:call("getComponent(System.Type)", sdk.typeof("app.Character"))
+                                local target = ch or victim
+                                PB.javelin_unbind_targets = PB.javelin_unbind_targets or {}
+                                table.insert(PB.javelin_unbind_targets, { target = target, untilT = os.clock() + 0.45 })
+                                local bc = nil
+                                pcall(function() bc = target:get_field("<BindCtrl>k__BackingField") end)
+                                if not bc and target.call then pcall(function() bc = target:call("get_BindCtrl") end) end
+                                if bc then
+                                    local mod = bc:call("get_MagicBind")
+                                    if mod then
+                                        mod:call("stop(System.Boolean)", false)
+                                        pcall(mod.call, mod, "deleteBindEffect")
+                                    end
+                                end
                             end
                             info.IsDirectDamageEnableAllDamageType = true
                         end)
@@ -3742,18 +3753,18 @@ pcall(function()
             if not info then return r end
             if isJav then
                 pcall(function()
-                    info.DamageType = 7                     -- Hitback_L (grounded heavy knockdown)
-                    info.DamageActType = 2                  -- Down / Stagger (NOT Blown / Yeet)
-                    info.OverwriteBlownType = 7
-                    info.DamageReaction = 200               -- Firm knockdown in front of player
+                    info.DamageType = 6                     -- Hitback_M (clean flinch impact, NO stun)
+                    info.DamageActType = 1                  -- Flinch
+                    info.OverwriteBlownType = 6
+                    info.DamageReaction = 120               -- Moderate flinch stagger
                     info.BlownReactionRate = 0
                     info.BlownReactionConvertLevel = 0
-                    info.HitBackZ = math.min(info.HitBackZ or 0, 2.0)
-                    info.HitBackY = 0                       -- No vertical launch
+                    info.HitBackZ = math.min(info.HitBackZ or 0, 1.2)
+                    info.HitBackY = 0
                     info.HitBackAddZ = 0
                     info.HitBackVec = Vector3f.new(0, 0, 0)
                 end)
-                return sdk.to_ptr(7)                        -- Return Hitback_L to engine
+                return sdk.to_ptr(6)                        -- Return Hitback_M (flinch) to engine
             end
             local v = sdk.to_int64(r) & 0xFFFFFFFF
             if not HEAVIER[v] then return r end
@@ -5206,14 +5217,8 @@ end)()
             local hold_time = now - PB.heavy_hold_t0
             if hold_time >= 0.35 then
                 if not PB.heavy_charge or PB.heavy_charge.phase == "idle" then
-                    PB.heavy_charge = { phase = "charged", t0 = now, glowT = now }
-                    pcall(function() if dbg.rim_glow then dbg.rim_glow(a, true, 0.45) end end)
+                    PB.heavy_charge = { phase = "charged", t0 = now }
                     note("Stormblade: Lightning Javelin charged!")
-                else
-                    if now - (PB.heavy_charge.glowT or 0) >= 0.30 then
-                        PB.heavy_charge.glowT = now
-                        pcall(function() if dbg.rim_glow then dbg.rim_glow(a, true, 0.35) end end)
-                    end
                 end
             end
         else
@@ -5244,7 +5249,7 @@ end)()
 
         if PB.javelin_active then
             local elapsed = now - (PB.javelin_t0 or now)
-            if not PB.javelin_spawned and elapsed >= 0.15 then
+            if not PB.javelin_spawned and elapsed >= 0.12 then
                 PB.javelin_spawned = true
                 PB.javelinT = now
                 local shell_node = {
@@ -5252,12 +5257,12 @@ end)()
                     id = "sb_javelin",
                     shell = PB.JOB07_SHELLS or "AppSystem/Shell/UserData/HumanShellParamData_Job07.user",
                     shell_id = 12,
-                    scale_axes = { 0.8, 0.8, 4.0 },
+                    scale_axes = { 0.7, 0.7, 4.5 },
                     cast = { mode = "joint", joint = "L_Hand_Palm", face = "crosshair" },
                     element = "Thunder",
-                    damage_type = "Hitback_L",
+                    damage_type = "Hitback_M",
                     color = { 50, 200, 255, 255 },
-                    speed = 4.5
+                    speed = 5.5
                 }
                 local res, err = spawn(a, shell_node, nil)
                 if res and res.record then
@@ -5268,6 +5273,41 @@ end)()
             if elapsed >= 0.75 then
                 PB.javelin_active = false
             end
+        end
+
+        -- Cleanse any residual MagicBind paralysis on javelin targets (Zero stun, pure damage)
+        if PB.javelin_unbind_targets and #PB.javelin_unbind_targets > 0 then
+            local now_t = os.clock()
+            for i = #PB.javelin_unbind_targets, 1, -1 do
+                local entry = PB.javelin_unbind_targets[i]
+                if now_t > entry.untilT then
+                    table.remove(PB.javelin_unbind_targets, i)
+                else
+                    pcall(function()
+                        local t = entry.target
+                        local bc = nil
+                        pcall(function() bc = t:get_field("<BindCtrl>k__BackingField") end)
+                        if not bc and t.call then pcall(function() bc = t:call("get_BindCtrl") end) end
+                        if bc then
+                            local mod = bc:call("get_MagicBind")
+                            if mod then
+                                mod:call("stop(System.Boolean)", false)
+                                pcall(mod.call, mod, "deleteBindEffect")
+                            end
+                        end
+                    end)
+                end
+            end
+        end
+        if a.character and PB.javelinT and (now - PB.javelinT < 1.0) then
+            pcall(function()
+                local h = a.character:get_GameObject():call("getComponent(System.Type)", sdk.typeof("app.Human"))
+                if h then
+                    local j7 = h:get_field("<Job07ActionCtrl>k__BackingField")
+                    local mb = j7 and j7:get_field("<MagicBindCtrl>k__BackingField")
+                    if mb then mb:call("resetHitMagicBindInfo") end
+                end
+            end)
         end
 
         -- Maintain native Thunder Boon crackling electricity on the sword
@@ -8239,7 +8279,7 @@ pcall(function()
             st.pbJavPow = nil
             if jInfo then
                 pcall(function()
-                    jInfo.DamageReaction = 200
+                    jInfo.DamageReaction = 120
                     jInfo.ForceFactor = 0
                     jInfo.BlownReactionRate = 0
                     jInfo.HitBackY = 0

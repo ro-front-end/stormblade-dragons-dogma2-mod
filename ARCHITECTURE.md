@@ -55,15 +55,13 @@ Rank 4: sb_combo.json    (Tempest Flurry  — Wild Furie terrestrial rush)
 Rank 5: sb_levin.json    (Thunder Stun    — Off-hand palm paralyzing bolt)
 Rank 6: sb_fall.json     (Thunder Fall    — High-impact ground impale with Levin pillar)
 Core:   Lightning Step   (Pure directional quickstep dodge mapped to RB)
-Core:   Thunderstrike / Lightning Javelin (Dual off-hand magic on Triangle/Y: tap for fast palm shockwave, hold for charged stance & javelin throw)
+Core:   Heavy Stab / Lightning Javelin (Tap: native Fighter heavy stab & downed finisher; Hold: charged Lightning Javelin)
 ```
 
-### 3.1 Dual Off-Hand Heavy Attack Interception (`requestActionCore`)
-To replace Fighter's vanilla heavy downward slash without interfering with normal attacks:
-* **Interception Target:** Native `requestActionCore` intercepts only `Job01_HeavyAttack` and `Job01_ViolentStabStart`. Normal attacks (`Job01_AttackLeft`, `Job01_AttackRight`, `Job01_TuskToss`) are 100% bypassed and preserved.
-* **Tap (< 350ms):** Executes `Thunderstrike` via `Job07_MagicBindComplete` (2.2x Strength hybrid lightning damage, `Hitback_S`).
-* **Hold (≥ 350ms):** Arisen enters `Job07_Gungnir` charging stance with sustained electric aura; on release, executes `Job07_FarThrow` / `ThrowObject`, launching high-velocity lightning javelin (`speed = 4.0`, 2.8x Strength hybrid damage, `Hitback_L` heavy knockdown).
-
+### 3.1 Dual Heavy Attack & Lightning Javelin Architecture
+Stormblade implements a dual-mode heavy attack system with zero action interference:
+* **Quick Tap (< 350ms) — Native Fighter Heavy Stab & Finisher:** All hooks (equestActionCore) bypass quick taps completely. Vanilla Job01_HeavyAttack and grounded finishers (FinishingMove / DownAttack) execute with 100% engine purity, zero animation stutter, no stamina drain, and zero projectile release.
+* **Hold (>= 350ms) — Charged Lightning Javelin:** Holding AttackL enters a charging phase. On release, executes Job07_MagicBindComplete at 1.4x animation speed, launching a high-velocity piercing spear (speed = 5.5, scale_axes = {0.7, 0.7, 4.5}). Stun and MagicBind paralysis are dynamically purged to prevent cheesy freezes, applying a solid flinch impact (Hitback_M, 1.85x Strength scaling) and guaranteeing 100% EXP and drops. Crash-prone MaterialInterpolation hooks were eliminated for complete render-thread stability.
 ---
 
 ## 4. Git Branching Strategy & Release Discipline
