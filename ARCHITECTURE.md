@@ -43,7 +43,7 @@ This document outlines the software design principles, conventions, architectura
 
 ---
 
-## 3. Skill & Progression Catalog (6 Skills + Core Evasion)
+## 3. Skill & Progression Catalog (6 Skills + 2 Core Mechanics)
 
 The complete skill catalog is architected for both standard 4-slot loadouts and expanded 6-slot environments:
 
@@ -55,7 +55,14 @@ Rank 4: sb_combo.json    (Tempest Flurry  — Wild Furie terrestrial rush)
 Rank 5: sb_levin.json    (Thunder Stun    — Off-hand palm paralyzing bolt)
 Rank 6: sb_fall.json     (Thunder Fall    — High-impact ground impale with Levin pillar)
 Core:   Lightning Step   (Pure directional quickstep dodge mapped to RB)
+Core:   Thunderstrike / Lightning Javelin (Dual off-hand magic on Triangle/Y: tap for fast palm shockwave, hold for charged stance & javelin throw)
 ```
+
+### 3.1 Dual Off-Hand Heavy Attack Interception (`requestActionCore`)
+To replace Fighter's vanilla heavy downward slash without interfering with normal attacks:
+* **Interception Target:** Native `requestActionCore` intercepts only `Job01_HeavyAttack` and `Job01_ViolentStabStart`. Normal attacks (`Job01_AttackLeft`, `Job01_AttackRight`, `Job01_TuskToss`) are 100% bypassed and preserved.
+* **Tap (< 350ms):** Executes `Thunderstrike` via `Job07_MagicBindComplete` (2.2x Strength hybrid lightning damage, `Hitback_S`).
+* **Hold (≥ 350ms):** Arisen enters `Job07_Gungnir` charging stance with sustained electric aura; on release, executes `Job07_FarThrow` / `ThrowObject`, launching high-velocity lightning javelin (`speed = 4.0`, 2.8x Strength hybrid damage, `Hitback_L` heavy knockdown).
 
 ---
 
