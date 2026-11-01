@@ -538,12 +538,10 @@ pcall(function()
         if ok and name and PB.activeVocation == "stormblade" and (name:find("HeavyAttack") or name:find("ViolentStabStart")) then
             local a = runtime.player()
             if a and a:valid() and not PB.in_thunderstrike then
-                PB.in_thunderstrike = true
-                a:request_action("Job07_MagicBindComplete", 0)
-                PB.thunderstrike_active = true
-                PB.thunderstrike_t0 = os.clock()
-                PB.thunderstrike_spawned = false
-                PB.in_thunderstrike = false
+                if PB.heavy_charge and PB.heavy_charge.phase ~= "idle" then
+                    return sdk.PreHookResult.SKIP_ORIGINAL
+                end
+                PB.heavy_charge = { phase = "holding", t0 = os.clock(), charged = false, glowT = 0, inStance = false }
                 return sdk.PreHookResult.SKIP_ORIGINAL
             end
         end
@@ -3230,6 +3228,7 @@ pcall(function()
             end
             if not s.pbKind and PB.activeVocation == "stormblade" then
                 if PB.thunderstrikeT and os.clock() - PB.thunderstrikeT < 2.0 then s.pbKind = "thunderstrike"
+                elseif PB.javelinT and os.clock() - PB.javelinT < 2.5 then s.pbKind = "javelin"
                 elseif PB.levinT and os.clock() - PB.levinT < 3.5 then s.pbKind = "levin"
                 elseif PB.novaT and os.clock() - PB.novaT < 2.5 then s.pbKind = "nova" end
             end
@@ -3288,9 +3287,9 @@ pcall(function()
                 end)
                 row.enchant = info.EnchantDamage
                 row.elemental = info.NonMagicElementDamage
-                if PB.activeVocation == "stormblade" and (kind == "charged" or kind == "tap" or kind == "burst" or kind == "bind" or kind == "levin" or kind == "nova" or kind == "thunderstrike") then
+                if PB.activeVocation == "stormblade" and (kind == "charged" or kind == "tap" or kind == "burst" or kind == "bind" or kind == "levin" or kind == "nova" or kind == "thunderstrike" or kind == "javelin") then
                     local str = PB.player_strength()
-                    local mul = (kind == "levin" and 2.8) or (kind == "thunderstrike" and 2.2) or (kind == "nova" and 2.0) or (kind == "charged" and 2.2) or (kind == "burst" and 1.5) or 1.0
+                    local mul = (kind == "javelin" and 2.8) or (kind == "levin" and 2.8) or (kind == "thunderstrike" and 2.2) or (kind == "nova" and 2.0) or (kind == "charged" and 2.2) or (kind == "burst" and 1.5) or 1.0
                     local dmg = str * mul * (info.DamageRate or 1)
                     info.Damage = dmg
                     pcall(function() info.IsMagicAttack = true end)
@@ -3299,10 +3298,10 @@ pcall(function()
                     pcall(function() info.NonMagicElementDamage = dmg end)
                     pcall(function() info.SlashDamage = 0; info.ShootDamage = 0; info.StrikeDamage = 0 end)
                     pcall(function() info.DamageType = 6; info.DamageActType = 6; info.IsDirectDamageEnableAllDamageType = true end)
-                    pcall(function() info.DamageReaction = (kind == "thunderstrike" and 350) or (kind == "charged" and 450) or 250 end)
+                    pcall(function() info.DamageReaction = (kind == "javelin" and 500) or (kind == "thunderstrike" and 350) or (kind == "charged" and 450) or 250 end)
                     pcall(function() info:call("set_ElementType", 3) end)
                     pcall(function() if info["<AttackUserData>k__BackingField"] then info["<AttackUserData>k__BackingField"]:set_field("_ElementType", 3) end end)
-                    row.kind = (kind == "thunderstrike" and "Thunderstrike") or (kind == "levin" and "Levin Storm") or (kind == "nova" and "Nova Eléctrica") or ("Storm Bolt (" .. tostring(kind) .. ")")
+                    row.kind = (kind == "javelin" and "Lightning Javelin") or (kind == "thunderstrike" and "Thunderstrike") or (kind == "levin" and "Levin Storm") or (kind == "nova" and "Nova Eléctrica") or ("Storm Bolt (" .. tostring(kind) .. ")")
                     dbg.boltMag = str
                     note(("Stormblade %s hit: %.0f lightning damage (strength %.0f x%.1f)"):format(row.kind, dmg, str, mul))
                 elseif kind == "bind" then
@@ -5135,9 +5134,13 @@ end)()
 ------------------------------------------------------------------------
 ;(function()
     PB.JOBMAGIC_SHELLS = "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user"
+    PB.JOB08_SHELLS = "AppSystem/Shell/UserData/HumanShellParamData_Job08.user"
     pcall(function()
         local fx = require("DragonCore.game.actor_fx")
-        if fx and fx.preload_shell then fx.preload_shell(PB.JOBMAGIC_SHELLS) end
+        if fx and fx.preload_shell then
+            fx.preload_shell(PB.JOBMAGIC_SHELLS)
+            fx.preload_shell(PB.JOB08_SHELLS)
+        end
     end)
 
     local function update_stormblade_skills()
@@ -5145,6 +5148,110 @@ end)()
         local a = runtime.player()
         if not a or not a:valid() then return end
         local now = os.clock()
+        -- Heavy attack (Triangle / Y): Tap (Thunderstrike) vs Hold (Lightning Javelin)
+        if PB.heavy_charge and PB.heavy_charge.phase ~= "idle" then
+            local down = a:button_down("AttackL")
+            local elapsed = now - PB.heavy_charge.t0
+
+            if PB.heavy_charge.phase == "holding" then
+                if not down then
+                    -- Released before 0.35s: Quick Tap -> Thunderstrike!
+                    PB.heavy_charge.phase = "idle"
+                    PB.in_thunderstrike = true
+                    a:request_action("Job07_MagicBindComplete", 0)
+                    PB.thunderstrike_active = true
+                    PB.thunderstrike_t0 = now
+                    PB.thunderstrike_spawned = false
+                    PB.in_thunderstrike = false
+                    note(("Stormblade: Thunderstrike tap released after %.2fs"):format(elapsed))
+                elseif elapsed >= 0.35 then
+                    -- Reached charge threshold: transition to charged!
+                    PB.heavy_charge.phase = "charged"
+                    PB.heavy_charge.glowT = now
+                    if not PB.heavy_charge.inStance then
+                        PB.heavy_charge.inStance = true
+                        pcall(function()
+                            local ok = a:request_action("Job07_Gungnir", 0)
+                            if not ok then a:request_action("Job07_HoldDownAttack", 0) end
+                        end)
+                    end
+                    pcall(function()
+                        if dbg.rim_glow then dbg.rim_glow(a, true, 0.45) end
+                    end)
+                    note("Stormblade: Lightning Javelin charged and ready!")
+                end
+            elseif PB.heavy_charge.phase == "charged" then
+                if down then
+                    -- Keep electric aura active while holding charge
+                    if now - (PB.heavy_charge.glowT or 0) >= 0.30 then
+                        PB.heavy_charge.glowT = now
+                        pcall(function()
+                            if dbg.rim_glow then dbg.rim_glow(a, true, 0.35) end
+                        end)
+                    end
+                    if elapsed > 4.5 then
+                        PB.heavy_charge.phase = "idle"
+                    end
+                else
+                    -- Released after charge: Hurl Lightning Javelin with throw animation!
+                    PB.heavy_charge.phase = "idle"
+                    PB.in_thunderstrike = true
+                    pcall(function()
+                        local ok = a:request_action("Job07_FarThrow", 0)
+                        if not ok then ok = a:request_action("ThrowObject", 0) end
+                        if not ok then ok = a:request_action("Job07_GungnirShoot", 0) end
+                        if not ok then a:request_action("Job07_MagicBindComplete", 0) end
+                    end)
+                    pcall(function()
+                        if a.character and a.character.FullBodyLayer then
+                            a.character.FullBodyLayer:call("set_PlaySpeed", 1.4)
+                        end
+                    end)
+                    PB.javelin_active = true
+                    PB.javelin_t0 = now
+                    PB.javelin_spawned = false
+                    PB.in_thunderstrike = false
+                    note(("Stormblade: Lightning Javelin hurled after %.2fs charge"):format(elapsed))
+                end
+            end
+        end
+
+        -- Lightning Javelin charged release
+        if PB.javelin_active then
+            local elapsed = now - (PB.javelin_t0 or now)
+            if not PB.javelin_spawned and elapsed >= 0.15 then
+                PB.javelin_spawned = true
+                PB.javelinT = now
+                local shell_node = {
+                    type = "shell",
+                    id = "sb_javelin",
+                    shell = PB.JOB08_SHELLS or "AppSystem/Shell/UserData/HumanShellParamData_Job08.user",
+                    shell_id = 96,
+                    cast = { mode = "joint", joint = "L_Hand_Palm", face = "crosshair" },
+                    element = "Thunder",
+                    damage_type = "Hitback_L",
+                    attack_rate = 2.8,
+                    color = { 80, 220, 255, 255 },
+                    speed = 4.0
+                }
+                local res, err = spawn(a, shell_node, nil)
+                if not (res and res.record) then
+                    -- Fallback to Job07 shell 12 with elongated scale
+                    shell_node.shell = PB.JOB07_SHELLS or "AppSystem/Shell/UserData/HumanShellParamData_Job07.user"
+                    shell_node.shell_id = 12
+                    shell_node.scale_axes = { 0.7, 0.7, 4.0 }
+                    res, err = spawn(a, shell_node, nil)
+                end
+                if res and res.record then
+                    colour_shell(res.record, { 0.30, 0.85, 1.0, 1.0 }, 6.0, true)
+                    note("Stormblade: Lightning Javelin hurled!")
+                end
+            end
+            if elapsed >= 0.75 then
+                PB.javelin_active = false
+            end
+        end
+
         -- Thunderstrike off-hand palm burst
         if PB.thunderstrike_active then
             local elapsed = now - (PB.thunderstrike_t0 or now)
