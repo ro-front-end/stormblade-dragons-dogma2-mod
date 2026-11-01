@@ -3282,10 +3282,10 @@ pcall(function()
                 end)
                 row.enchant = info.EnchantDamage
                 row.elemental = info.NonMagicElementDamage
-                if PB.activeVocation == "stormblade" and (kind == "charged" or kind == "tap" or kind == "burst" or kind == "bind" or kind == "levin" or kind == "nova" or kind == "thunderstrike" or kind == "javelin") then
+                if PB.activeVocation == "stormblade" and (kind == "charged" or kind == "tap" or kind == "burst" or kind == "bind" or kind == "levin" or kind == "nova" or kind == "thunderstrike" or kind == "javelin" or kind == "slash") then
                     local str = PB.player_strength()
-                    local mul = (kind == "javelin" and 1.85) or (kind == "thunderstrike" and 0.60) or (kind == "levin" and 3.2) or (kind == "nova" and 2.0) or (kind == "charged" and 2.2) or (kind == "burst" and 1.5) or 1.0
-                    local rate = (kind == "thunderstrike" or kind == "javelin") and 1.0 or (info.DamageRate or 1)
+                    local mul = (kind == "javelin" and 1.85) or (kind == "thunderstrike" and 0.60) or (kind == "levin" and 3.2) or (kind == "nova" and 2.0) or (kind == "charged" and 2.2) or (kind == "burst" and 1.5) or (kind == "slash" and 1.0) or 1.0
+                    local rate = (kind == "thunderstrike" or kind == "javelin" or kind == "slash") and 1.0 or (info.DamageRate or 1)
                     local dmg = math.floor(str * mul * rate)
                     info.Damage = dmg
                     pcall(function() info.IsMagicAttack = true end)
@@ -3334,7 +3334,7 @@ pcall(function()
                     end
                     pcall(function() info:call("set_ElementType", 3) end)
                     pcall(function() if info["<AttackUserData>k__BackingField"] then info["<AttackUserData>k__BackingField"]:set_field("_ElementType", 3) end end)
-                    row.kind = (kind == "javelin" and "Lightning Javelin") or (kind == "thunderstrike" and "Thunderstrike") or (kind == "levin" and "Levin Storm") or (kind == "nova" and "Nova Eléctrica") or ("Storm Bolt (" .. tostring(kind) .. ")")
+                    row.kind = (kind == "slash" and "Arc Slash (wave)") or (kind == "javelin" and "Lightning Javelin") or (kind == "thunderstrike" and "Thunderstrike") or (kind == "levin" and "Levin Storm") or (kind == "nova" and "Nova Electrica") or ("Storm Bolt (" .. tostring(kind) .. ")")
                     dbg.boltMag = str
                     note(("Stormblade %s hit: %.0f lightning damage (strength %.0f x%.2f)"):format(row.kind, dmg, str, mul))
                 elseif kind == "bind" then
@@ -3350,10 +3350,16 @@ pcall(function()
                 elseif live.on and phys + mag > 0 then
                     info.Damage = before * (phys * PB.PHYS_BONUS + mag * PB.MAG_BONUS) / (phys + mag)
                 end
-                if kind and live.on and BLAST[kind] and BLAST[kind].dmgMul then info.Damage = info.Damage * BLAST[kind].dmgMul end
-                if not kind and live.on and combo.slash and combo.slash.on then   -- (1.0.1 user) Eldritch Slash's sword swing x3
-                    info.Damage = info.Damage * (combo.slash.swordMul or 2)   -- (1.0.2 user: x2)
-                    row.kind = "Eldritch Slash (sword)"
+                if kind and live.on and BLAST[kind] and BLAST[kind].dmgMul and PB.activeVocation ~= "stormblade" then info.Damage = info.Damage * BLAST[kind].dmgMul end
+                if not kind and live.on and combo.slash and combo.slash.on then
+                    if PB.activeVocation == "stormblade" then
+                        local str = PB.player_strength()
+                        info.Damage = math.floor(str * 1.0)
+                        row.kind = "Arc Slash (sword)"
+                    else
+                        info.Damage = info.Damage * (combo.slash.swordMul or 2)
+                        row.kind = "Eldritch Slash (sword)"
+                    end
                 end
                 if kind == "charged" and live.on then   -- (3.34: the beam's damage base: the game's raw magick value)
                     dbg.boltMag = (PB.activeVocation == "stormblade") and PB.player_strength() or (mag * (info.DamageRate or 1))
