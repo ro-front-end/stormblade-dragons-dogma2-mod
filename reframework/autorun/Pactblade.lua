@@ -3289,12 +3289,13 @@ pcall(function()
                 row.elemental = info.NonMagicElementDamage
                 if PB.activeVocation == "stormblade" and (kind == "charged" or kind == "tap" or kind == "burst" or kind == "bind" or kind == "levin" or kind == "nova" or kind == "thunderstrike" or kind == "javelin") then
                     local str = PB.player_strength()
-                    local mul = (kind == "javelin" and 2.8) or (kind == "levin" and 2.8) or (kind == "thunderstrike" and 2.2) or (kind == "nova" and 2.0) or (kind == "charged" and 2.2) or (kind == "burst" and 1.5) or 1.0
-                    local dmg = str * mul * (info.DamageRate or 1)
+                    local mul = (kind == "javelin" and 1.35) or (kind == "thunderstrike" and 0.60) or (kind == "levin" and 2.8) or (kind == "nova" and 2.0) or (kind == "charged" and 2.2) or (kind == "burst" and 1.5) or 1.0
+                    local rate = (kind == "thunderstrike" or kind == "javelin") and 1.0 or (info.DamageRate or 1)
+                    local dmg = math.floor(str * mul * rate)
                     info.Damage = dmg
                     pcall(function() info.IsMagicAttack = true end)
                     pcall(function() info.MagicDamage = dmg end)
-                    pcall(function() info.EnchantDamage = dmg end)
+                    pcall(function() info.EnchantDamage = 0 end)
                     pcall(function() info.NonMagicElementDamage = dmg end)
                     pcall(function() info.SlashDamage = 0; info.ShootDamage = 0; info.StrikeDamage = 0 end)
                     pcall(function() info.DamageType = 6; info.DamageActType = 6; info.IsDirectDamageEnableAllDamageType = true end)
@@ -3303,7 +3304,7 @@ pcall(function()
                     pcall(function() if info["<AttackUserData>k__BackingField"] then info["<AttackUserData>k__BackingField"]:set_field("_ElementType", 3) end end)
                     row.kind = (kind == "javelin" and "Lightning Javelin") or (kind == "thunderstrike" and "Thunderstrike") or (kind == "levin" and "Levin Storm") or (kind == "nova" and "Nova Eléctrica") or ("Storm Bolt (" .. tostring(kind) .. ")")
                     dbg.boltMag = str
-                    note(("Stormblade %s hit: %.0f lightning damage (strength %.0f x%.1f)"):format(row.kind, dmg, str, mul))
+                    note(("Stormblade %s hit: %.0f lightning damage (strength %.0f x%.2f)"):format(row.kind, dmg, str, mul))
                 elseif kind == "bind" then
                     info.Damage = 1
                     row.kind = "Forbeding Bolt"
@@ -5230,7 +5231,6 @@ end)()
                     cast = { mode = "joint", joint = "L_Hand_Palm", face = "crosshair" },
                     element = "Thunder",
                     damage_type = "Hitback_L",
-                    attack_rate = 2.8,
                     color = { 80, 220, 255, 255 },
                     speed = 4.0
                 }
@@ -5266,7 +5266,6 @@ end)()
                     cast = { mode = "joint", joint = "L_Hand_Palm", face = "owner" },
                     element = "Thunder",
                     damage_type = "Hitback_S",
-                    attack_rate = 2.2,
                     color = { 50, 180, 255, 255 },
                     scale = 1.0
                 }
