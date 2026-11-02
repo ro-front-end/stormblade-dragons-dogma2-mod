@@ -301,6 +301,9 @@ pcall(function()   -- (4.04) a skill's own big drain swapped for our cost (dbg.s
     end, function(r) return r end)
 end)
 function dbg.stam_cost(a, what, cost)
+    if PB.activeVocation == "stormblade" and PB.has_augment and PB.has_augment("eye_of_hurricane") then
+        cost = math.floor(cost * 0.90 + 0.5)
+    end
     pcall(function() dbg.stamCosts[#dbg.stamCosts + 1] = { what = what, cost = cost, before = a:stamina(), at = os.clock() + 0.6 } end)
 end
 re.on_pre_application_entry("LateUpdateBehavior", function()
@@ -504,14 +507,15 @@ local function vsb_state()
     return "not picked"
 end
 
-;(function()   -- the VSB pick kept over a script reset
+;(function()   -- the VSB pick kept over a script reset (always preserves stormblade)
     local FILE = "Pactblade_vsb_pick.json"
     re.on_script_reset(function()
-        pcall(json.dump_file, FILE, { picked = vsb_state() == "picked", at = os.time() })
+        local curPick = PB.activeVocation or "stormblade"
+        pcall(json.dump_file, FILE, { picked = vsb_state() == "picked", vocation = curPick, at = os.time() })
     end)
     local saved = json.load_file(FILE)
     pcall(json.dump_file, FILE, {})   -- used once
-    if type(saved) ~= "table" or not saved.picked or type(saved.at) ~= "number" or os.time() - saved.at > 60 then return end
+    local wantVoc = (type(saved) == "table" and saved.vocation == "stormblade") and "stormblade" or "stormblade"
     local tries = 0
     local function again()
         if tries < 0 then return end
@@ -520,11 +524,11 @@ end
         local app = api and api.app
         if app and app.picks and app.set_vocation_pick then
             tries = -1
-            if app.picks.Job01 == nil then
-                local ok, e = pcall(app.set_vocation_pick, app, "Job01", PACK_ID)
-                note(ok and "script reset: Pactblade picked in VSB again" or ("script reset: re-pick failed: " .. tostring(e)))
+            if app.picks.Job01 == nil or app.picks.Job01 == "pactblade" then
+                local ok, e = pcall(app.set_vocation_pick, app, "Job01", wantVoc)
+                note(ok and ("script reset: " .. wantVoc .. " picked in VSB again") or ("script reset: re-pick failed: " .. tostring(e)))
             end
-        elseif tries > 1200 then tries = -1; note("script reset: VSB not found - Pactblade not re-picked") end
+        elseif tries > 1200 then tries = -1; note("script reset: VSB not found - vocation not re-picked") end
     end
     re.on_frame(function() pcall(again) end)
 end)()
@@ -3294,7 +3298,8 @@ pcall(function()
                     local str = PB.player_strength()
                     local mul = (kind == "javelin" and 1.85) or (kind == "thunderstrike" and 0.60) or (kind == "levin" and 3.2) or (kind == "nova" and 2.0) or (kind == "charged" and 2.2) or (kind == "burst" and 1.5) or (kind == "slash" and 1.0) or 1.0
                     local rate = (kind == "thunderstrike" or kind == "javelin" or kind == "slash") and 1.0 or (info.DamageRate or 1)
-                    local dmg = math.floor(str * mul * rate)
+                    local overloadMul = (PB.overload_mul and PB.overload_mul(info, true)) or 1.0
+                    local dmg = math.floor(str * mul * rate * overloadMul)
                     info.Damage = dmg
                     pcall(function() info.IsMagicAttack = true end)
                     pcall(function() info.MagicDamage = dmg end)
@@ -3362,11 +3367,19 @@ pcall(function()
                 if not kind and live.on and combo.slash and combo.slash.on then
                     if PB.activeVocation == "stormblade" then
                         local str = PB.player_strength()
-                        info.Damage = math.floor(str * 1.0)
+                        local overloadMul = (PB.overload_mul and PB.overload_mul(info, true)) or 1.0
+                        info.Damage = math.floor(str * 1.0 * overloadMul)
                         row.kind = "Arc Slash (sword)"
                     else
                         info.Damage = info.Damage * (combo.slash.swordMul or 2)
                         row.kind = "Eldritch Slash (sword)"
+                    end
+                elseif not kind and live.on and PB.activeVocation == "stormblade" and PB.overload_mul then
+                    local isThunder = (tonumber(el) == 3)
+                    if not isThunder then pcall(function() isThunder = (tonumber(info:call("get_ElementType")) == 3) end) end
+                    if isThunder then
+                        local om = PB.overload_mul(info, true)
+                        if om > 1.0 then info.Damage = math.floor(info.Damage * om) end
                     end
                 end
                 if kind == "charged" and live.on then   -- (3.34: the beam's damage base: the game's raw magick value)
@@ -5495,11 +5508,337 @@ end)()
         end
     end
 
+    -- 4. Stormblade 5 Rank-Scaled Augmentations (Fulmination, Conductivity, Aegis of the Storm, Overload, Eye of the Hurricane)
+    PB.AUGMENTS = {
+        { id = "fulmination",      rank = 2, name = "Fulmination",          desc = "+30 Strength (physical & lightning scaling)" },
+        { id = "conductivity",     rank = 4, name = "Conductivity",         desc = "+150 Max Stamina" },
+        { id = "aegis",            rank = 6, name = "Aegis of the Storm",   desc = "+45 Magick Defense" },
+        { id = "overload",         rank = 8, name = "Overload",             desc = "+20% Thunder damage vs Weak / Drenched targets" },
+        { id = "eye_of_hurricane", rank = 9, name = "Eye of the Hurricane", desc = "-10% Stamina cost on skills" },
+    }
+    PB.augments_unlock_all = false -- Progressive unlock by Stormblade Vocation Rank (Ranks 2, 4, 6, 8, 9)
+    PB.augments_enabled = {
+        fulmination = true,
+        conductivity = true,
+        aegis = true,
+        overload = true,
+        eye_of_hurricane = true,
+    }
+    PB.augment_ranks = {
+        fulmination = 2,
+        conductivity = 4,
+        aegis = 6,
+        overload = 8,
+        eye_of_hurricane = 9,
+    }
+
+    function PB.stormblade_rank()
+        local vr = nil
+        pcall(function()
+            local vp = package.loaded["VSB.game.vocprogress"]
+            if vp and vp.rank_of_pack then
+                vr = tonumber(vp.rank_of_pack("stormblade"))
+            end
+        end)
+        if vr and vr >= 1 then return vr end
+        local r = 1
+        pcall(function()
+            local a = runtime.player()
+            local human = a and a.character and a.character:get_Human()
+            local jc = human and human["<JobContext>k__BackingField"]
+            if jc then
+                local jr = tonumber(jc:call("calcJobRank(app.Character.JobEnum)", 1))
+                if jr and jr > r then r = jr end
+            end
+        end)
+        return r
+    end
+
+    function PB.has_augment(id)
+        if not live.on or PB.activeVocation ~= "stormblade" then return false end
+        if PB.augments_enabled[id] == false then return false end
+        if PB.augments_unlock_all then return true end
+        local req = PB.augment_ranks[id] or 1
+        return PB.stormblade_rank() >= req
+    end
+
+    -- Overload (Rank 8): +20% Thunder damage on weak-point or drenched/tarred targets
+    function PB.overload_mul(info, isThunder)
+        if not PB.has_augment("overload") or not isThunder or not info then return 1.0 end
+        local boost = false
+        pcall(function()
+            if info.IsWeakDamage == true or info["<IsWeakDamage>k__BackingField"] == true then
+                boost = true
+            end
+        end)
+        if not boost then
+            pcall(function()
+                local victim = info["<DamageGameObject>k__BackingField"]
+                local ch = victim and victim:call("getComponent(System.Type)", sdk.typeof("app.Character"))
+                local sctrl = ch and ch["<StatusConditionCtrl>k__BackingField"]
+                if sctrl then
+                    -- StatusConditionEnum: WaterSpread (Drenched = 3), OilSpread (Tarred = 4), Thunder (Levin/Shock = 9)
+                    for _, cond in ipairs({ 3, 4, 9 }) do
+                        if sctrl:call("IsStatusConditionActive(app.StatusConditionDef.StatusConditionEnum, System.Boolean)", cond, false) == true then
+                            boost = true
+                            break
+                        end
+                    end
+                end
+            end)
+        end
+        if boost then
+            note("Stormblade Overload: +20% Thunder damage triggered!")
+            return 1.20
+        end
+        return 1.0
+    end
+
+    -- Conductivity (Rank 4): +150 Max Stamina via app.StaminaManager:get_MaxValue()
+    pcall(function()
+        local smgTd = sdk.find_type_definition("app.StaminaManager")
+        local getMax = smgTd and smgTd:get_method("get_MaxValue()")
+        if getMax then
+            sdk.hook(getMax, function(args)
+                thread.get_hook_storage().sbSmg = args[2]
+            end, function(r)
+                if not PB.has_augment("conductivity") then return r end
+                local ok, newR = pcall(function()
+                    local a = runtime.player()
+                    local mySmg = a and a.character and a.character:get_StaminaManager()
+                    local thisSmg = sdk.to_managed_object(thread.get_hook_storage().sbSmg)
+                    if mySmg and thisSmg and mySmg:get_address() == thisSmg:get_address() then
+                        return sdk.float_to_ptr(sdk.to_float(r) + 150.0)
+                    end
+                end)
+                if ok and newR then return newR end
+                return r
+            end)
+        end
+    end)
+
+    -- Eye of the Hurricane (Rank 9): -10% Stamina Cost via app.HumanStaminaController:Chara_OnConsumeStaminaHandler
+    pcall(function()
+        local hscTd = sdk.find_type_definition("app.HumanStaminaController")
+        local consumeM = hscTd and hscTd:get_method("Chara_OnConsumeStaminaHandler(System.Single, app.StaminaParameterBase.Parameter)")
+        if consumeM then
+            sdk.hook(consumeM, function(args)
+                if not PB.has_augment("eye_of_hurricane") then return end
+                pcall(function()
+                    local this = sdk.to_managed_object(args[2])
+                    local owner = this and this["Chara"]
+                    if owner and live.go and owner:get_GameObject():get_address() == live.go then
+                        local v = sdk.to_float(args[3])
+                        if v > 0 then
+                            args[3] = sdk.float_to_ptr(v * 0.90)
+                        end
+                    end
+                end)
+            end, function(r) return r end)
+        end
+    end)
+
+    -- Fulmination (Rank 2: +30 Strength) & Aegis of the Storm (Rank 6: +45 Magick Defense)
+    -- Applied cleanly to the equipped weapon / armor parameters and PlayerAttackDefenceStatus so Status & Equipment menus show them natively!
+    local sbAugMod = { sword = nil, armor = nil, lastCheck = 0 }
+    PB.sbAugMod = sbAugMod
+
+    local function restore_sb_aug_items()
+        local changed = false
+        if sbAugMod.sword then
+            local m = sbAugMod.sword
+            pcall(function() m.param._PhysicalAttack = m.origAtk end)
+            if m.own then pcall(function() m.own._PhysicalAttack = m.origOwnAtk end) end
+            sbAugMod.sword = nil
+            changed = true
+        end
+        if sbAugMod.armor then
+            local m = sbAugMod.armor
+            pcall(function() m.param._MagicDefence = m.origMdef end)
+            if m.own then pcall(function() m.own._MagicDefence = m.origOwnMdef end) end
+            sbAugMod.armor = nil
+            changed = true
+        end
+        if changed then
+            pcall(refresh_equipment, nil)
+        end
+    end
+
+    function PB.update_stormblade_augments(forceRestore)
+        if forceRestore or dbg.guardHold or not live.on or PB.activeVocation ~= "stormblade" then
+            if sbAugMod.sword or sbAugMod.armor then
+                restore_sb_aug_items()
+                note("Stormblade Augmentations: restored base weapon/armor stats")
+            end
+            return
+        end
+        local now = os.clock()
+        if not PB.forceAugmentReapply and (now - sbAugMod.lastCheck < 0.5) then return end
+        PB.forceAugmentReapply = false
+        sbAugMod.lastCheck = now
+
+        local im = sdk.get_managed_singleton("app.ItemManager")
+        local a = runtime.player()
+        if not im or not a or not a.character then return end
+
+        local wantFulm = PB.has_augment("fulmination")
+        local wantAegis = PB.has_augment("aegis")
+        local needRefresh = false
+
+        -- 1. Fulmination (+30 Strength on equipped main sword)
+        local wid = held_weapon_id()
+        if wantFulm and wid then
+            local okP, param = pcall(function() return im:call("getItemData(app.WeaponID)", wid) end)
+            if okP and param then
+                if sbAugMod.sword and sbAugMod.sword.id ~= wid then
+                    local old = sbAugMod.sword
+                    pcall(function() old.param._PhysicalAttack = old.origAtk end)
+                    if old.own then pcall(function() old.own._PhysicalAttack = old.origOwnAtk end) end
+                    sbAugMod.sword = nil
+                end
+                if not sbAugMod.sword then
+                    local origAtk = param._PhysicalAttack or 0
+                    local ownObj, origOwnAtk = nil, nil
+                    pcall(function()
+                        local sd = dbg.main_weapon_sd()
+                        local o = sd and sd:get_field("_ItemData")
+                        if o and o:get_address() ~= param:get_address() and o:get_field("_PhysicalAttack") ~= nil then
+                            ownObj = o:add_ref()
+                            origOwnAtk = o._PhysicalAttack
+                        end
+                    end)
+                    sbAugMod.sword = { id = wid, param = param:add_ref(), origAtk = origAtk, own = ownObj, origOwnAtk = origOwnAtk }
+                    param._PhysicalAttack = origAtk + 30
+                    if ownObj then ownObj._PhysicalAttack = origOwnAtk + 30 end
+                    needRefresh = true
+                    note(("Stormblade Fulmination: Sword Strength %d -> %d (+30)"):format(origAtk, origAtk + 30))
+                elseif param._PhysicalAttack ~= (sbAugMod.sword.origAtk + 30) then
+                    param._PhysicalAttack = sbAugMod.sword.origAtk + 30
+                    if sbAugMod.sword.own then sbAugMod.sword.own._PhysicalAttack = sbAugMod.sword.origOwnAtk + 30 end
+                    needRefresh = true
+                end
+            end
+        elseif sbAugMod.sword then
+            local old = sbAugMod.sword
+            pcall(function() old.param._PhysicalAttack = old.origAtk end)
+            if old.own then pcall(function() old.own._PhysicalAttack = old.origOwnAtk end) end
+            sbAugMod.sword = nil
+            needRefresh = true
+        end
+
+        -- 2. Aegis of the Storm (+45 Magick Defense on equipped armor piece)
+        local ed = im:call("getEquipData(app.Character)", a.character)
+        local data = ed and ed:get_field("Data")
+        local armorSd, armorId = nil, nil
+        if data then
+            for _, slotIdx in ipairs({ 3, 4, 2, 5 }) do -- Upper(3), Lower(4), Helm(2), Mantle(5)
+                local sd = data:call("get(app.EquipData.SlotEnum)", slotIdx)
+                local id = sd and sd:get_field("_ItemId")
+                if id and id > 0 then
+                    armorSd, armorId = sd, id
+                    break
+                end
+            end
+        end
+        if wantAegis and armorId then
+            local okA, aparam = pcall(function() return im:call("getItemData(System.Int32)", armorId) end)
+            if okA and aparam then
+                if sbAugMod.armor and sbAugMod.armor.id ~= armorId then
+                    local old = sbAugMod.armor
+                    pcall(function() old.param._MagicDefence = old.origMdef end)
+                    if old.own then pcall(function() old.own._MagicDefence = old.origOwnMdef end) end
+                    sbAugMod.armor = nil
+                end
+                if not sbAugMod.armor then
+                    local origMdef = aparam._MagicDefence or 0
+                    local ownObj, origOwnMdef = nil, nil
+                    pcall(function()
+                        local o = armorSd and armorSd:get_field("_ItemData")
+                        if o and o:get_address() ~= aparam:get_address() and o:get_field("_MagicDefence") ~= nil then
+                            ownObj = o:add_ref()
+                            origOwnMdef = o._MagicDefence
+                        end
+                    end)
+                    sbAugMod.armor = { id = armorId, param = aparam:add_ref(), origMdef = origMdef, own = ownObj, origOwnMdef = origOwnMdef }
+                    aparam._MagicDefence = origMdef + 45
+                    if ownObj then ownObj._MagicDefence = origOwnMdef + 45 end
+                    needRefresh = true
+                    note(("Stormblade Aegis of the Storm: Armor Magick Defense %d -> %d (+45)"):format(origMdef, origMdef + 45))
+                elseif aparam._MagicDefence ~= (sbAugMod.armor.origMdef + 45) then
+                    aparam._MagicDefence = sbAugMod.armor.origMdef + 45
+                    if sbAugMod.armor.own then sbAugMod.armor.own._MagicDefence = sbAugMod.armor.origOwnMdef + 45 end
+                    needRefresh = true
+                end
+            end
+        elseif sbAugMod.armor then
+            local old = sbAugMod.armor
+            pcall(function() old.param._MagicDefence = old.origMdef end)
+            if old.own then pcall(function() old.own._MagicDefence = old.origOwnMdef end) end
+            sbAugMod.armor = nil
+            needRefresh = true
+        end
+
+        if needRefresh then
+            pcall(refresh_equipment, sbAugMod.sword and sbAugMod.sword.param and sbAugMod.sword.param._Id or nil)
+        end
+    end
+
+    -- Also hook PlayerStatusCalculator & PlayerAttackDefenceStatus so the Status Screen shows +30 Strength & +45 Magick Defense even if unarmored or paused!
+    local sbStatDone = {}
+    local function apply_sb_status_calc(st)
+        if not st or not live.on or PB.activeVocation ~= "stormblade" then return end
+        local addr = st:get_address()
+        local now = os.clock()
+        if sbStatDone[addr] and (now - sbStatDone[addr] < 0.05) then return end
+        sbStatDone[addr] = now
+        -- If no sword item mod is active yet, add +30 to AdditionalAttack
+        if PB.has_augment("fulmination") and not sbAugMod.sword then
+            pcall(function()
+                local aa = st:get_field("<AdditionalAttack>k__BackingField") or 0
+                st:set_field("<AdditionalAttack>k__BackingField", aa + 30)
+            end)
+        end
+        -- If no armor item mod is active yet, add +45 to AdditionalMagicDefence
+        if PB.has_augment("aegis") and not sbAugMod.armor then
+            pcall(function()
+                local am = st:get_field("<AdditionalMagicDefence>k__BackingField") or 0
+                st:set_field("<AdditionalMagicDefence>k__BackingField", am + 45)
+            end)
+        end
+    end
+    pcall(function()
+        local PSC = sdk.find_type_definition("app.PlayerStatusCalculator")
+        for _, sig in ipairs({ "calcAttackDefenceWithEquipmentAndBuff()", "calcAttackDefenceWithEquipmentAndBuff(app.PlayerStatusCalculatorParameter)" }) do
+            pcall(function()
+                sdk.hook(PSC:get_method(sig), function(args)
+                    thread.get_hook_storage().sbCalc = args[2]
+                end, function(r)
+                    if not live.on or PB.activeVocation ~= "stormblade" then return r end
+                    pcall(function()
+                        local me = sdk.to_managed_object(thread.get_hook_storage().sbCalc)
+                        local a = runtime.player()
+                        if me and a and a.character and me:get_field("CharaID") == a.character:get_CharaID() then
+                            apply_sb_status_calc(sdk.to_managed_object(r))
+                        end
+                    end)
+                    return r
+                end)
+            end)
+        end
+    end)
+
     PB.forceArmorReapply = true
-    re.on_script_reset(function() pcall(PB.update_stormblade_armor, true) end)
+    PB.forceAugmentReapply = true
+    re.on_script_reset(function()
+        pcall(PB.update_stormblade_armor, true)
+        pcall(PB.update_stormblade_augments, true)
+    end)
     re.on_pre_application_entry("UpdateBehavior", function()
         update_stormblade_skills()
+    end)
+    re.on_frame(function()
         pcall(PB.update_stormblade_armor, false)
+        pcall(PB.update_stormblade_augments, false)
     end)
 end)()
 
@@ -11626,6 +11965,7 @@ end)()
         G.stripAt = os.clock()
         pcall(sword_restore)
         if PB.update_stormblade_armor then pcall(PB.update_stormblade_armor, true) end
+        if PB.update_stormblade_augments then pcall(PB.update_stormblade_augments, true) end
         G.chestWas = false
         pcall(function()
             local gu = dbg.guise
@@ -12222,6 +12562,26 @@ re.on_draw_ui(function()
     end
     if live.on and live.shieldWorn then
         imgui.text_colored("Pactblade can't use a shield: take yours off (it can't be equipped while active).", 0xFF40C0FF)
+    end
+    if PB.activeVocation == "stormblade" and PB.AUGMENTS then
+        if imgui.tree_node("Stormblade Augmentations (5)") then
+            local rank = PB.stormblade_rank and PB.stormblade_rank() or 1
+            local str = PB.player_strength and PB.player_strength() or 0
+            local maxStam = 0
+            pcall(function() maxStam = runtime.player().character:get_StaminaManager():get_MaxValue() end)
+            imgui.text(("Vocation Rank: %d | Strength: %.0f | Max Stamina: %.0f"):format(rank, str, maxStam))
+            local chAll
+            chAll, PB.augments_unlock_all = imgui.checkbox("Unlock all 5 Augmentations regardless of Rank (Test Mode)", PB.augments_unlock_all)
+            if chAll then PB.forceAugmentReapply = true end
+            for _, aug in ipairs(PB.AUGMENTS) do
+                local activeNow = PB.has_augment(aug.id)
+                local label = ("Rank %d - %s: %s [%s]"):format(aug.rank, aug.name, aug.desc, activeNow and "ACTIVE" or "LOCKED")
+                local chA
+                chA, PB.augments_enabled[aug.id] = imgui.checkbox(label .. "##sbaug_" .. aug.id, PB.augments_enabled[aug.id] ~= false)
+                if chA then PB.forceAugmentReapply = true end
+            end
+            imgui.tree_pop()
+        end
     end
     if json.RELEASE then   -- (1.0) the release menu
         ch, cfg.nox = imgui.checkbox("Nox sword look (purple mist + blade glow)", cfg.nox)
