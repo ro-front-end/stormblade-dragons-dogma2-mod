@@ -722,12 +722,20 @@ pcall(function()
             if not live.on then return end
             local skip = false
             pcall(function()
-                if (sdk.to_int64(args[5]) & 0xFFFFFFFF) ~= SLOT_SUB then return end
+                local slot = sdk.to_int64(args[5]) & 0xFFFFFFFF
                 local ch = sdk.to_managed_object(args[4])
                 if not ch or ch:get_GameObject():get_address() ~= live.go then return end
                 local sd = sdk.to_valuetype(args[3], "app.ItemDefine.StorageData")
                 if sd:get_field("_IsEquipped") then return end
-                skip = true
+                if slot == SLOT_SUB then
+                    skip = true
+                elseif PB.activeVocation == "stormblade" and PB.blockedHeavyArmor then
+                    local itemId = sd:get_field("_ItemId") or sd.ItemId
+                    if itemId and PB.blockedHeavyArmor[itemId] then
+                        skip = true
+                        note("Stormblade: Heavy armor refused (Light/Medium armor only)")
+                    end
+                end
             end)
             if skip then
                 dbg.shieldRefused = (dbg.shieldRefused or 0) + 1
@@ -5393,7 +5401,106 @@ end)()
         end
     end
 
-    re.on_pre_application_entry("UpdateBehavior", update_stormblade_skills)
+    -- 3. Native Light Armor Wardrobe (Stormblade Only: Allows Light/Medium Armor, Blocks Heavy Plate Armor)
+    local armorOrigJobs = {}
+    local armorApplied = false
+    PB.blockedHeavyArmor = {}
+
+    -- Exact DD2 ItemArmorParam._Job bitmask (1 << JobEnum):
+    -- Job01 (Fighter)       = 2
+    -- Job02 (Archer)        = 4
+    -- Job03 (Mage)          = 8
+    -- Job04 (Thief)         = 16
+    -- Job05 (Warrior)       = 32
+    -- Job06 (Sorcerer)      = 64
+    -- Job07 (Spearhand)     = 128
+    -- Job08 (Magick Archer) = 256
+    -- Job09 (Trickster)     = 512
+    local JOB_FIGHTER = 2
+    local JOB_MAGE    = 8
+    local JOB_WARRIOR = 32
+    local LIGHT_MASK  = 4 + 8 + 16 + 128 + 256 -- Archer(4) + Mage(8) + Thief(16) + Spearhand(128) + MagickArcher(256)
+
+    local function is_heavy_armor(entry, origJob)
+        if origJob and origJob > 0 and origJob ~= 65535 then
+            -- 1. If Vanilla Fighter (2) or Warrior (32) can wear it:
+            if (origJob & (JOB_FIGHTER + JOB_WARRIOR)) ~= 0 then
+                -- Only allow if Mage (8) can ALSO wear it (universal light clothes/cloaks like Beseecher's Hood, Explorer's Boots)
+                if (origJob & JOB_MAGE) ~= 0 then
+                    return false -- Universal Light / All-Vocation piece -> ALLOWED
+                end
+                return true -- Fighter/Warrior armor (Sentry's Coif, Foot Soldier Armor, Chain Mail, Worker's Greaves) -> BLOCKED!
+            end
+            -- 2. If Vanilla Fighter CANNOT wear it, allow if it belongs to Archer, Mage, Thief, Spearhand, or Magick Archer:
+            if (origJob & LIGHT_MASK) ~= 0 then
+                return false -- Pure Light Armor (Felt Cap, Dyed-Cloth Mask, Brigand's Vest, Missionary's Robe, Woodland Boots) -> ALLOWED!
+            end
+            return true
+        end
+        local w = tonumber(entry._Weight) or 0
+        local def = tonumber(entry._PhysicalDefence) or 0
+        local mdef = tonumber(entry._MagicDefence) or 0
+        if w <= 1.15 and def <= 8 then return false end
+        if mdef < (def * 0.75) and w >= 1.65 then return true end
+        if w >= 2.80 then return true end
+        return false
+    end
+
+    function PB.update_stormblade_armor(forceRestore)
+        local want = (not forceRestore) and (not dbg.guardHold) and live.on and (PB.activeVocation == "stormblade")
+        if want == armorApplied and not PB.forceArmorReapply then return end
+        PB.forceArmorReapply = false
+        local im = sdk.get_managed_singleton("app.ItemManager")
+        if not im or not im._ItemDataDict or not im._ItemDataDict._entries then return end
+        local armorType = sdk.typeof("app.ItemArmorParam")
+        if want then
+            PB.blockedHeavyArmor = {}
+            local allowedCount, blockedCount = 0, 0
+            for _, kv in pairs(im._ItemDataDict._entries) do
+                local entry = kv and kv.value
+                if entry and entry:GetType() == armorType then
+                    local id = kv.key or entry._Id
+                    if id then
+                        if armorOrigJobs[id] == nil then
+                            armorOrigJobs[id] = entry._Job
+                        end
+                        local orig = armorOrigJobs[id] or 0
+                        if is_heavy_armor(entry, orig) then
+                            local stripped = (orig & ~JOB_FIGHTER)
+                            entry._Job = stripped ~= 0 and stripped or JOB_WARRIOR
+                            PB.blockedHeavyArmor[id] = true
+                            blockedCount = blockedCount + 1
+                        else
+                            entry._Job = (orig > 0 and orig ~= 65535) and (orig | JOB_FIGHTER) or 65535
+                            allowedCount = allowedCount + 1
+                        end
+                    end
+                end
+            end
+            armorApplied = true
+            note(("Stormblade Wardrobe: %d Light armors enabled, %d Heavy armors blocked"):format(allowedCount, blockedCount))
+        else
+            for _, kv in pairs(im._ItemDataDict._entries) do
+                local entry = kv and kv.value
+                if entry and entry:GetType() == armorType then
+                    local id = kv.key or entry._Id
+                    if id and armorOrigJobs[id] ~= nil then
+                        entry._Job = armorOrigJobs[id]
+                    end
+                end
+            end
+            PB.blockedHeavyArmor = {}
+            armorApplied = false
+            note("Stormblade Wardrobe: restored original armor job requirements")
+        end
+    end
+
+    PB.forceArmorReapply = true
+    re.on_script_reset(function() pcall(PB.update_stormblade_armor, true) end)
+    re.on_pre_application_entry("UpdateBehavior", function()
+        update_stormblade_skills()
+        pcall(PB.update_stormblade_armor, false)
+    end)
 end)()
 
 re.on_frame(function()
@@ -11518,6 +11625,7 @@ end)()
         dbg.guardHold = true
         G.stripAt = os.clock()
         pcall(sword_restore)
+        if PB.update_stormblade_armor then pcall(PB.update_stormblade_armor, true) end
         G.chestWas = false
         pcall(function()
             local gu = dbg.guise
