@@ -5258,19 +5258,20 @@ end)()
             if not PB.javelin_spawned and elapsed >= 0.12 then
                 PB.javelin_spawned = true
                 PB.javelinT = now
+                local t = dbg.beam and dbg.beam.aim_pick and dbg.beam.aim_pick(a, 0.6)
+                local targetPos = nil
+                if t then pcall(function() targetPos = t:get_GameObject():get_Transform():get_Position() end) end
                 local shell_node = {
                     type = "shell",
                     id = "sb_javelin",
-                    shell = PB.JOB07_SHELLS or "AppSystem/Shell/UserData/HumanShellParamData_Job07.user",
-                    shell_id = 12,
-                    scale_axes = { 0.7, 0.7, 4.5 },
-                    cast = { mode = "joint", joint = "L_Hand_Palm", face = "crosshair" },
+                    shell = PB.JOBMAGIC_SHELLS or "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
+                    shell_id = 8,
+                    scale = 1.15,
+                    cast = targetPos and { mode = "target", lock_range = 12 } or { mode = "owner", offset = { 0, 0, 2.5 }, face = "owner" },
                     element = "Thunder",
-                    damage_type = "Hitback_M",
-                    color = { 50, 200, 255, 255 },
-                    speed = 5.5
+                    damage_type = "Hitback_M"
                 }
-                local res, err = spawn(a, shell_node, nil)
+                local res, err = spawn(a, shell_node, targetPos and { aim = targetPos } or nil)
                 if res and res.record then
                     colour_shell(res.record, { 0.30, 0.85, 1.0, 1.0 }, 6.0, true)
                     note("Stormblade: Lightning Javelin hurled!")
