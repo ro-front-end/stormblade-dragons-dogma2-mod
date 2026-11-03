@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "uuid": "7a31b412-4019-4b21-99ee-b01149e1c002",
+  "id": "sb_core_overcharge",
+  "kind": "core",
+  "presentation": {
+    "name": {
+      "en": "Tempest Overcharge"
+    },
+    "desc": {
+      "en": "Light sword slashes supercharge your off-hand for 2.5s, halving the charge time required to unleash a heavy Levin strike combo (from 0.35s down to 0.18s)."
+    },
+    "icon": 9,
+    "sort_hint": 20
+  },
+  "availability": {
+    "list_under": "Job01",
+    "mode": "all",
+    "unlock_by": "custom"
+  },
+  "levels": {
+    "1": {
+      "unlock_rank": 4,
+      "dcp_cost": 900
+    }
+  },
+  "trigger": {
+    "type": "event",
+    "event": "passive"
+  },
+  "timeline": [
+    {
+      "id": "end_node",
+      "type": "flow",
+      "frame": 0,
+      "op": "end"
+    }
+  ]
+}

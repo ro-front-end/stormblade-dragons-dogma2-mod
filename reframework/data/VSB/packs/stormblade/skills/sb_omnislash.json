@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "uuid": "7a31b412-4019-4b21-99ee-b01149e1a009",
+  "id": "sb_omnislash",
+  "kind": "custom",
+  "presentation": {
+    "name": {
+      "en": "Omnislash: Raijin"
+    },
+    "desc": {
+      "en": "Maister's Art. Become living lightning, blinking across foes in a blinding multi-stage electric sword combo from every side before cleaving them from above with a final thunderbolt."
+    },
+    "icon": 46
+  },
+  "availability": {
+    "list_under": "Job01",
+    "mode": "all",
+    "unlock_by": "custom"
+  },
+  "levels": {
+    "1": {
+      "unlock_rank": 9,
+      "dcp_cost": 6000
+    }
+  },
+  "trigger": {
+    "type": "slot"
+  },
+  "timeline": [
+    {
+      "id": "n1",
+      "type": "script",
+      "frame": 0,
+      "fn": "return true"
+    }
+  ]
+}

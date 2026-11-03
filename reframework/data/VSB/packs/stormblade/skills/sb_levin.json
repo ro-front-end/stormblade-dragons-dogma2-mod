@@ -13,7 +13,9 @@
     "icon": 35
   },
   "availability": {
-    "mode": "all"
+    "list_under": "Job01",
+    "mode": "all",
+    "unlock_by": "custom"
   },
   "levels": {
     "1": {

@@ -376,6 +376,7 @@ function dbg.press_ok() return not dbg.INTEGRATED or (dbg.pbDepth or 0) > 0 end
         ["7ad9aec8-a3c5-5c3e-a951-05fdea168a69"] = "dive", ["94db826d-21fc-53d1-805a-29bb376004c3"] = "strike",
         -- Stormblade custom skills (4 Clean Skills: Arc Slash, Tempest Flurry, Levin Storm, Nova Eléctrica)
         ["7a31b412-4019-4b21-99ee-b01149e1a002"] = "slash", -- Arc Slash (sb_slash.json)
+        ["7a31b412-4019-4b21-99ee-b01149e1a009"] = "combo", -- Omnislash: Raijin (sb_omnislash.json Maister Skill)
         -- ["7a31b412-4019-4b21-99ee-b01149e1a005"] = "combo", -- Tempest Flurry (Decoupled for native VSB Wild Furie timeline)
         -- ["7a31b412-4019-4b21-99ee-b01149e1a007"] = "nova",  -- Nova Eléctrica (Decoupled for native VSB timeline)
     }
@@ -3203,6 +3204,19 @@ pcall(function()
             s.pbInfo, s.pbKind = nil, nil
             if not live.go then return end
             local info = sdk.to_managed_object(args[3])
+            if info and live.go and PB.activeVocation == "stormblade" then
+                pcall(function()
+                    local victim = info["<DamageGameObject>k__BackingField"]
+                    if victim and victim:get_address() == live.go then
+                        local nowH = os.clock()
+                        PB.lastGotHitAt = nowH
+                        if PB.has_core_skill and PB.has_core_skill("counter") and (nowH - (PB.lastDodgeAt or 0) <= 0.45) then
+                            info.Damage = math.floor((info.Damage or 0) * 0.5)
+                            if PB.trigger_static_counter then pcall(PB.trigger_static_counter) end
+                        end
+                    end
+                end)
+            end
             local owner = info and info["<AttackOwnerObject>k__BackingField"]
             if not owner or owner:get_address() ~= live.go then return end
             s.pbInfo = info
@@ -3234,7 +3248,10 @@ pcall(function()
                 end)
             end
             if not s.pbKind and PB.activeVocation == "stormblade" then
-                if PB.thunderstrikeT and os.clock() - PB.thunderstrikeT < 2.0 then s.pbKind = "thunderstrike"
+                if PB.staticCounterT and os.clock() - PB.staticCounterT < 1.5 then s.pbKind = "static_counter"
+                elseif PB.stormCarveT and os.clock() - PB.stormCarveT < 1.5 then s.pbKind = "storm_carve"
+                elseif PB.omnislashT and os.clock() - PB.omnislashT < 2.5 then s.pbKind = "omnislash"
+                elseif PB.thunderstrikeT and os.clock() - PB.thunderstrikeT < 2.0 then s.pbKind = "thunderstrike"
                 elseif PB.javelinT and os.clock() - PB.javelinT < 2.5 then s.pbKind = "javelin"
                 elseif PB.levinT and os.clock() - PB.levinT < 3.5 then s.pbKind = "levin"
                 elseif PB.novaT and os.clock() - PB.novaT < 2.5 then s.pbKind = "nova" end
@@ -3294,10 +3311,10 @@ pcall(function()
                 end)
                 row.enchant = info.EnchantDamage
                 row.elemental = info.NonMagicElementDamage
-                if PB.activeVocation == "stormblade" and (kind == "charged" or kind == "tap" or kind == "burst" or kind == "bind" or kind == "levin" or kind == "nova" or kind == "thunderstrike" or kind == "javelin" or kind == "slash") then
+                if PB.activeVocation == "stormblade" and (kind == "charged" or kind == "tap" or kind == "burst" or kind == "bind" or kind == "levin" or kind == "nova" or kind == "thunderstrike" or kind == "javelin" or kind == "slash" or kind == "static_counter" or kind == "storm_carve" or kind == "omnislash") then
                     local str = PB.player_strength()
-                    local mul = (kind == "javelin" and 1.85) or (kind == "thunderstrike" and 0.60) or (kind == "levin" and 3.2) or (kind == "nova" and 2.0) or (kind == "charged" and 2.2) or (kind == "burst" and 1.5) or (kind == "slash" and 1.0) or 1.0
-                    local rate = (kind == "thunderstrike" or kind == "javelin" or kind == "slash") and 1.0 or (info.DamageRate or 1)
+                    local mul = (kind == "javelin" and 1.85) or (kind == "static_counter" and 1.25) or (kind == "storm_carve" and 0.85) or (kind == "omnislash" and 1.65) or (kind == "thunderstrike" and 0.60) or (kind == "levin" and 3.2) or (kind == "nova" and 2.0) or (kind == "charged" and 2.2) or (kind == "burst" and 1.5) or (kind == "slash" and 1.0) or 1.0
+                    local rate = (kind == "thunderstrike" or kind == "javelin" or kind == "slash" or kind == "static_counter" or kind == "storm_carve" or kind == "omnislash") and 1.0 or (info.DamageRate or 1)
                     local overloadMul = (PB.overload_mul and PB.overload_mul(info, true)) or 1.0
                     local dmg = math.floor(str * mul * rate * overloadMul)
                     info.Damage = dmg
@@ -4138,6 +4155,9 @@ local function combo_stage(a, k)
     elseif combo.swordHidden then sword_shown(true); combo.swordHidden = false end
     pcall(function() combo.prevMot = motion_key(a.character.FullBodyLayer) end)
     combo_request(a, part.action)
+    if PB.activeVocation == "stormblade" and PB.fire_omnislash_stage then
+        pcall(PB.fire_omnislash_stage, a, k)
+    end
     note(("combo %d: %s (frames %.1f-%s)"):format(k, part.action, part.from, part.to and ("%.1f"):format(part.to) or "end"))
     combo.everUsed = true
 end
@@ -5237,15 +5257,63 @@ end)()
         local cur_act = a:current_action(0) or ""
         local is_finisher = cur_act:find("FinishingMove") or cur_act:find("DownAttack")
 
+        -- Core Skill 2: Tempest Overcharge (Rank 4) - Light sword slashes grant 2.5s of 2x faster Heavy Levin charge (0.18s vs 0.35s)
+        if cur_act == "Job01_AttackLeft" or cur_act == "Job01_AttackRight" or cur_act == "Job01_AttackAir" or cur_act:find("^Job01_ComboAttack") or cur_act:find("^Job01_JustAttack") then
+            PB.tempestOverchargeUntil = now + 2.5
+        end
+
+        -- Core Skill 1: Static Counter (Rank 2) - Electric discharge when executing Lightning Step (RB) within 0.35s of an enemy blow or in close combat
+        if a:button_pressed("JobSpecialAction") or (cur_act == PB.DODGE and (now - (PB.lastDodgeAt or 0) > 0.35)) then
+            PB.lastDodgeAt = now
+            if PB.has_core_skill and PB.has_core_skill("counter") then
+                local recentHit = (now - (PB.lastGotHitAt or 0)) <= 0.35
+                local closeThreat = false
+                if not recentHit then
+                    pcall(function()
+                        local t = dbg.beam and dbg.beam.aim_pick and dbg.beam.aim_pick(a, 0.22)
+                        if t then
+                            local p1 = a.character:get_GameObject():get_Transform():get_Position()
+                            local p2 = t:get_GameObject():get_Transform():get_Position()
+                            local dx, dz = p1.x - p2.x, p1.z - p2.z
+                            if (dx * dx + dz * dz) <= (4.2 * 4.2) then closeThreat = true end
+                        end
+                    end)
+                end
+                if recentHit or closeThreat then
+                    pcall(PB.trigger_static_counter, a)
+                end
+            end
+        end
+
+        -- Core Skill 3: Storm Carve (Rank 6) - Bonus lightning shock every 2nd sword strike while clinging/climbing or pinning a monster
+        if PB.has_core_skill and PB.has_core_skill("carve") then
+            local isClingAtk = cur_act:find("CatchAttack") ~= nil or cur_act:find("AttackHold") ~= nil or cur_act:find("HoldAttack") ~= nil
+            if isClingAtk then
+                local motKey = cur_act
+                pcall(function()
+                    local L = a.character.FullBodyLayer
+                    local fr = L and L:call("get_Frame") or 0
+                    if fr < 8 and (now - (PB.lastCarveSwingAt or 0) > 0.32) then
+                        PB.lastCarveSwingAt = now
+                        PB.carveSwingCount = (PB.carveSwingCount or 0) + 1
+                        if (PB.carveSwingCount % 2) == 0 and PB.trigger_storm_carve then
+                            pcall(PB.trigger_storm_carve, a)
+                        end
+                    end
+                end)
+            end
+        end
+
+        local reqHold = (PB.has_core_skill and PB.has_core_skill("overcharge") and now <= (PB.tempestOverchargeUntil or 0)) and 0.18 or 0.35
         if a:button_down("AttackL") and not is_finisher then
             if not PB.heavy_hold_t0 then
                 PB.heavy_hold_t0 = now
             end
             local hold_time = now - PB.heavy_hold_t0
-            if hold_time >= 0.35 then
+            if hold_time >= reqHold then
                 if not PB.heavy_charge or PB.heavy_charge.phase == "idle" then
                     PB.heavy_charge = { phase = "charged", t0 = now }
-                    note("Stormblade: Lightning Javelin charged!")
+                    note(("Stormblade: Lightning Javelin charged (%.2fs)!"):format(reqHold))
                 end
             end
         else
@@ -5510,12 +5578,13 @@ end)()
 
     -- 4. Stormblade 5 Rank-Scaled Augmentations (Fulmination, Conductivity, Aegis of the Storm, Overload, Eye of the Hurricane)
     PB.AUGMENTS = {
-        { id = "fulmination",      rank = 2, name = "Fulmination",          desc = "+30 Strength (physical & lightning scaling)" },
-        { id = "conductivity",     rank = 4, name = "Conductivity",         desc = "+150 Max Stamina" },
-        { id = "aegis",            rank = 6, name = "Aegis of the Storm",   desc = "+45 Magick Defense" },
-        { id = "overload",         rank = 8, name = "Overload",             desc = "+20% Thunder damage vs Weak / Drenched targets" },
-        { id = "eye_of_hurricane", rank = 9, name = "Eye of the Hurricane", desc = "-10% Stamina cost on skills" },
+        { id = "fulmination",      rank = 2, dcp = 300,  vanilla_name = "Mettle",      name = "Fulmination",          desc = "+30 Strength (physical & lightning scaling) (300 Dcp)", ui_desc = "Increases your physical and lightning Strength by +30 while wielding a sword as a Stormblade." },
+        { id = "conductivity",     rank = 4, dcp = 900,  vanilla_name = "Provocation", name = "Conductivity",         desc = "+150 Max Stamina (900 Dcp)",                            ui_desc = "Bio-electrical conditioning increases your Maximum Stamina by +150." },
+        { id = "aegis",            rank = 6, dcp = 1800, vanilla_name = "Thew",        name = "Aegis of the Storm",   desc = "+45 Magick Defense (1800 Dcp)",                          ui_desc = "Wards your body with an electrostatic veil, increasing your Magick Defense by +45." },
+        { id = "overload",         rank = 8, dcp = 3000, vanilla_name = "Diligence",   name = "Overload",             desc = "+20% Thunder damage vs Weak / Drenched targets (3000 Dcp)", ui_desc = "Increases Thunder damage by +20% when striking monster weakpoints or drenched and shocked foes." },
+        { id = "eye_of_hurricane", rank = 9, dcp = 5000, vanilla_name = "Dominion",    name = "Eye of the Hurricane", desc = "-10% Stamina cost on skills (5000 Dcp)",                 ui_desc = "Calm focus at the center of the storm reduces the Stamina cost of all skills by 10%." },
     }
+    PB.augment_ability_ids = {}
     PB.augments_unlock_all = false -- Progressive unlock by Stormblade Vocation Rank (Ranks 2, 4, 6, 8, 9)
     PB.augments_enabled = {
         fulmination = true,
@@ -5559,7 +5628,20 @@ end)()
         if PB.augments_enabled[id] == false then return false end
         if PB.augments_unlock_all then return true end
         local req = PB.augment_ranks[id] or 1
-        return PB.stormblade_rank() >= req
+        if PB.stormblade_rank() < req then return false end
+        local aid = PB.augment_ability_ids and PB.augment_ability_ids[id]
+        if aid then
+            local bought = nil
+            pcall(function()
+                local a = runtime.player()
+                local ctx = a and a.human and a.human["<SkillContext>k__BackingField"]
+                if ctx then
+                    bought = (ctx:call("isAbilityEnable(app.HumanAbilityID)", aid) == true)
+                end
+            end)
+            if bought ~= nil then return bought end
+        end
+        return true
     end
 
     -- Overload (Rank 8): +20% Thunder damage on weak-point or drenched/tarred targets
@@ -5827,11 +5909,486 @@ end)()
         end
     end)
 
+    -- 5. Stormblade 3 Core Skills (Static Counter, Tempest Overcharge, Storm Carve) + Omnislash Stage Helper
+    PB.CORE_SKILLS = {
+        { id = "counter",    rank = 2, dcp = 400,  uuid = "7a31b412-4019-4b21-99ee-b01149e1c001", name = "Static Counter",     desc = "Lightning Step (RB) parry shockwave (1.25x Strength) + Thunder Boon (400 Dcp)" },
+        { id = "overcharge", rank = 4, dcp = 900,  uuid = "7a31b412-4019-4b21-99ee-b01149e1c002", name = "Tempest Overcharge", desc = "Light sword slashes halve Heavy Levin charge time (0.35s -> 0.18s) (900 Dcp)" },
+        { id = "carve",      rank = 6, dcp = 1500, uuid = "7a31b412-4019-4b21-99ee-b01149e1c003", name = "Storm Carve",        desc = "Every 2nd climbing/pinning slash triggers a 0.85x lightning jolt (1500 Dcp)" },
+    }
+    PB.core_skills_enabled = {
+        counter = true,
+        overcharge = true,
+        carve = true,
+    }
+    PB.core_skill_ranks = {
+        counter = 2,
+        overcharge = 4,
+        carve = 6,
+    }
+    PB.core_skill_uuids = {
+        counter = "7a31b412-4019-4b21-99ee-b01149e1c001",
+        overcharge = "7a31b412-4019-4b21-99ee-b01149e1c002",
+        carve = "7a31b412-4019-4b21-99ee-b01149e1c003",
+    }
+
+    function PB.has_core_skill(id)
+        if not live.on or PB.activeVocation ~= "stormblade" then return false end
+        if PB.core_skills_enabled[id] == false then return false end
+        if PB.augments_unlock_all then return true end
+        local req = PB.core_skill_ranks[id] or 1
+        if PB.stormblade_rank() < req then return false end
+        local uuid = PB.core_skill_uuids[id]
+        local bought = nil
+        pcall(function()
+            local sd = package.loaded["VSB.game.skilldefs"]
+            local plan = sd and sd.state and sd.state.plan
+            local entry = plan and plan.by_uuid and plan.by_uuid[uuid]
+            local gid = entry and entry.id
+            if gid then
+                local a = runtime.player()
+                local ctx = a and a.human and a.human["<SkillContext>k__BackingField"]
+                if ctx then
+                    bought = (ctx:call("isNormalSkillEnable(app.HumanNormalSkillID)", gid) == true)
+                end
+            end
+        end)
+        if bought ~= nil then return bought end
+        return true
+    end
+
+    function PB.trigger_static_counter(a)
+        local now = os.clock()
+        if now - (PB.lastStaticCounterAt or 0) < 1.2 then return end
+        a = a or runtime.player()
+        if not a or not a:valid() then return end
+        PB.lastStaticCounterAt = now
+        PB.staticCounterT = now
+        local res = spawn(a, {
+            type = "shell",
+            id = "sb_static_counter",
+            shell = PB.JOBMAGIC_SHELLS or "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
+            shell_id = 7,
+            scale = 1.35,
+            cast = { mode = "owner", offset = { 0, 0.9, 0.4 }, face = "owner" },
+            element = "Thunder",
+            damage_type = "Hitback_M"
+        })
+        if res and res.record then
+            colour_shell(res.record, { 0.25, 0.80, 1.0, 1.0 }, 6.0, true)
+        end
+        pcall(function()
+            local st = require("DragonCore.game.statuses")
+            if a.character then st.apply(a.character, "thunder_boon") end
+        end)
+        note("Stormblade Static Counter: electric parry shockwave unleashed!")
+    end
+
+    function PB.trigger_storm_carve(a)
+        local now = os.clock()
+        if now - (PB.lastStormCarveAt or 0) < 0.35 then return end
+        a = a or runtime.player()
+        if not a or not a:valid() then return end
+        PB.lastStormCarveAt = now
+        PB.stormCarveT = now
+        local res = spawn(a, {
+            type = "shell",
+            id = "sb_storm_carve",
+            shell = PB.JOBMAGIC_SHELLS or "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
+            shell_id = 7,
+            scale = 0.95,
+            cast = { mode = "owner", offset = { 0, 0.8, 0.8 }, face = "owner" },
+            element = "Thunder",
+            damage_type = "Hitback_S"
+        })
+        if res and res.record then
+            colour_shell(res.record, { 0.25, 0.85, 1.0, 1.0 }, 6.0, true)
+        end
+        note("Stormblade Storm Carve: clinging lightning jolt unleashed!")
+    end
+
+    function PB.fire_omnislash_stage(a, k)
+        local now = os.clock()
+        PB.omnislashT = now
+        local res = spawn(a, {
+            type = "shell",
+            id = "sb_omnislash_spark_" .. tostring(k),
+            shell = PB.JOBMAGIC_SHELLS or "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
+            shell_id = 7,
+            scale = (k == 4) and 1.45 or 1.15,
+            cast = { mode = "owner", offset = { 0, 0.9, 0.6 }, face = "owner" },
+            element = "Thunder",
+            damage_type = "Hitback_M"
+        })
+        if res and res.record then
+            colour_shell(res.record, { 0.25, 0.85, 1.0, 1.0 }, 6.0, true)
+        end
+        if k == 4 then
+            local bolt = spawn(a, {
+                type = "shell",
+                id = "sb_omnislash_finisher",
+                shell = PB.JOBMAGIC_SHELLS or "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
+                shell_id = 8,
+                scale = 1.35,
+                cast = { mode = "owner", offset = { 0, 0, 1.2 }, face = "owner" },
+                element = "Thunder",
+                damage_type = "Hitback_L"
+            })
+            if bolt and bolt.record then
+                colour_shell(bolt.record, { 0.25, 0.85, 1.0, 1.0 }, 6.0, true)
+            end
+            note("Stormblade Omnislash: Raijin thunderbolt finisher unleashed!")
+        end
+    end
+
+    -- 6. Vocation Guild Shield & Foreign-Pack Skill Filter (3-Layer Filter: Dictionary _UnlockRank + addContentsList + ScrollCtrlBase.makeList)
+    local SHIELD_CUSTOM_NAMES = {
+        "Job01_ShieldSummons",
+        "Job01_Springboard",
+        "Job01_CymbalAttack",
+        "Job01_ShieldCounter",
+        "Job01_FullMoonGuard",
+        "Job01_DivineDefense",
+    }
+    local SHIELD_CUSTOM_IDS = nil
+    local SHIELD_NORMAL_IDS = { [4] = true, [5] = true, [7] = true, [8] = true } -- Deflect, True Deflect, Steeled Foundation, Enchanted Counter
+
+    local function get_shield_custom_ids()
+        if SHIELD_CUSTOM_IDS then return SHIELD_CUSTOM_IDS end
+        local map = { [3] = "Job01_ShieldSummons", [4] = "Job01_Springboard", [5] = "Job01_CymbalAttack", [9] = "Job01_ShieldCounter", [10] = "Job01_FullMoonGuard", [11] = "Job01_DivineDefense" }
+        pcall(function()
+            local idTd = sdk.find_type_definition("app.HumanCustomSkillID")
+            if not idTd then return end
+            for _, name in ipairs(SHIELD_CUSTOM_NAMES) do
+                local f = idTd:get_field(name)
+                local v = f and f:get_data(nil)
+                if type(v) == "number" then
+                    map[v & 0xFFFFFFFF] = name
+                end
+            end
+        end)
+        SHIELD_CUSTOM_IDS = map
+        return map
+    end
+
+    local function is_foreign_vsb_custom(id)
+        local ok, foreign = pcall(function()
+            local sd = package.loaded["VSB.game.skilldefs"]
+            local plan = sd and sd.state and sd.state.plan
+            local item = plan and plan.custom and plan.custom[id]
+            local packId = item and item.entry and item.entry.pack_id
+            return packId ~= nil and packId ~= "stormblade"
+        end)
+        return ok and foreign == true
+    end
+
+    local function is_foreign_vsb_normal(id)
+        local ok, foreign = pcall(function()
+            local sd = package.loaded["VSB.game.skilldefs"]
+            local plan = sd and sd.state and sd.state.plan
+            local item = plan and plan.normal and plan.normal[id]
+            local packId = item and item.entry and item.entry.pack_id
+            return packId ~= nil and packId ~= "stormblade"
+        end)
+        return ok and foreign == true
+    end
+
+    local origCustomRanks = {}
+    local origNormalRanks = {}
+    local origAbilityRanks = {}
+    local AUG_ID_BY_RANK = { [2] = "fulmination", [4] = "conductivity", [6] = "aegis", [8] = "overload", [9] = "eye_of_hurricane" }
+    local guildDefsHidden = false
+
+    function PB.update_stormblade_guild_defs(forceRestore)
+        local wantHide = (not forceRestore) and (not dbg.guardHold) and live.on and (PB.activeVocation == "stormblade")
+        if not wantHide and not guildDefsHidden then return end
+        local gm = sdk.get_managed_singleton("app.GuiManager")
+        if not gm or not gm.CustomSkillDefineDictionary or not gm.NormalSkillDefineDictionary then return end
+        local cdict = gm.CustomSkillDefineDictionary
+        local jdict = gm.CustomSkillJobDefineDictionary and gm.CustomSkillJobDefineDictionary[1]
+        local ndict = gm.NormalSkillDefineDictionary["Job01"]
+        local adict = gm.AbilityDefineDictionary and gm.AbilityDefineDictionary["Job01"]
+        local shieldIds = get_shield_custom_ids()
+
+        if wantHide then
+            for sid in pairs(shieldIds) do
+                for _, d in ipairs({ cdict, jdict }) do
+                    if d then
+                        pcall(function()
+                            local levels = d[sid]
+                            if not levels then return end
+                            origCustomRanks[sid] = origCustomRanks[sid] or {}
+                            for lv = 1, 3 do
+                                pcall(function()
+                                    local p = levels[lv]
+                                    if p and p._UnlockRank ~= 99 then
+                                        if origCustomRanks[sid][lv] == nil then origCustomRanks[sid][lv] = p._UnlockRank end
+                                        p._UnlockRank = 99
+                                    end
+                                end)
+                            end
+                        end)
+                    end
+                end
+            end
+            if ndict then
+                for nid in pairs(SHIELD_NORMAL_IDS) do
+                    pcall(function()
+                        local p = ndict[nid]
+                        if p and p._UnlockRank ~= 99 then
+                            if origNormalRanks[nid] == nil then origNormalRanks[nid] = p._UnlockRank end
+                            p._UnlockRank = 99
+                        end
+                    end)
+                end
+            end
+            if adict then
+                local sbRank = PB.stormblade_rank()
+                pcall(function()
+                    local entries = adict._entries
+                    for i = 0, (adict._count or 0) - 1 do
+                        local e = entries[i]
+                        local aid = e and tonumber(e.key)
+                        local p = e and e.value
+                        if aid and p then
+                            if origAbilityRanks[aid] == nil and p._UnlockRank ~= 99 and p._UnlockRank ~= 1 then
+                                origAbilityRanks[aid] = p._UnlockRank
+                            end
+                            local baseRank = origAbilityRanks[aid]
+                            if baseRank then
+                                local augId = AUG_ID_BY_RANK[baseRank]
+                                if augId then PB.augment_ability_ids[augId] = aid end
+                                if PB.augments_unlock_all or sbRank >= baseRank then
+                                    p._UnlockRank = 1
+                                else
+                                    p._UnlockRank = 99
+                                end
+                            end
+                        end
+                    end
+                end)
+            end
+            guildDefsHidden = true
+        else
+            for sid, lvs in pairs(origCustomRanks) do
+                for _, d in ipairs({ cdict, jdict }) do
+                    if d then
+                        pcall(function()
+                            local levels = d[sid]
+                            if not levels then return end
+                            for lv, rnk in pairs(lvs) do
+                                pcall(function()
+                                    local p = levels[lv]
+                                    if p then p._UnlockRank = rnk end
+                                end)
+                            end
+                        end)
+                    end
+                end
+            end
+            if ndict then
+                for nid, rnk in pairs(origNormalRanks) do
+                    pcall(function()
+                        local p = ndict[nid]
+                        if p then p._UnlockRank = rnk end
+                    end)
+                end
+            end
+            if adict then
+                pcall(function()
+                    local entries = adict._entries
+                    for i = 0, (adict._count or 0) - 1 do
+                        local e = entries[i]
+                        local aid = e and tonumber(e.key)
+                        local p = e and e.value
+                        if aid and p and origAbilityRanks[aid] then
+                            p._UnlockRank = origAbilityRanks[aid]
+                        end
+                    end
+                end)
+            end
+            guildDefsHidden = false
+        end
+    end
+
+    pcall(function()
+        local BT = string.char(96) -- Backtick character (`) safe from PowerShell escaping
+        local LIST_TYPE = "System.Collections.Generic.List" .. BT .. "1<app.ui040101_00.MainContentsInfo>"
+        local LIST_ARGS = "(app.Character.JobEnum, app.JobContext, app.HumanSkillContext, " .. LIST_TYPE .. ", System.Boolean)"
+        local CTRL_BASE = "app.GUIBase.ScrollCtrlBase" .. BT .. "2<app.ui040101_00.MainContentsItem,app.ui040101_00.MainContentsInfo>"
+        local MAKE_LIST = "makeList(" .. LIST_TYPE .. ", System.Int32, System.Boolean)"
+        local CTX_TYPE  = "app.HumanSkillContext"
+
+        local function extract_by_type(args, maxIdx)
+            local found = {}
+            for i = 2, (maxIdx or 8) do
+                local ok, obj = pcall(sdk.to_managed_object, args[i])
+                if ok and obj then
+                    local got, tname = pcall(function() return obj:get_type_definition():get_full_name() end)
+                    if got and tname and not found[tname] then found[tname] = obj end
+                end
+            end
+            return found
+        end
+
+        local function filter_main_contents_list(list)
+            if not list or not live.on or PB.activeVocation ~= "stormblade" then return end
+            local shieldIds = get_shield_custom_ids()
+            local count = list:call("get_Count") or 0
+            for i = count - 1, 0, -1 do
+                local removeIt = false
+                pcall(function()
+                    local info = list:call("get_Item", i) or list[i]
+                    if not info then return end
+                    local ctype = tonumber(info.ContenstsType)
+                    -- Custom Skill entry (ContenstsType == 2 or info.Id > 0 without NormalSkill)
+                    local ns = info.NormalSkill
+                    local nsid = ns and tonumber(ns.SkillID)
+                    if nsid and nsid > 0 then
+                        local nid = nsid & 0xFFFFFFFF
+                        if SHIELD_NORMAL_IDS[nid] or is_foreign_vsb_normal(nid) then
+                            removeIt = true
+                        end
+                    elseif ctype ~= 1 then -- Never touch ContenstsType 1 (Vocations tab)!
+                        local cid = tonumber(info.Id)
+                        if cid and cid > 0 then
+                            cid = cid & 0xFFFFFFFF
+                            if shieldIds[cid] or is_foreign_vsb_custom(cid) then
+                                removeIt = true
+                            end
+                        end
+                    end
+                end)
+                if removeIt then
+                    pcall(function() list:call("RemoveAt(System.Int32)", i) end)
+                end
+            end
+        end
+
+        local uiTd = sdk.find_type_definition("app.ui040101_00")
+        if uiTd then
+            for _, mname in ipairs({ "addCustomSkillContentsList" .. LIST_ARGS, "addNormalContentsList" .. LIST_ARGS }) do
+                local m = uiTd:get_method(mname)
+                if m then
+                    sdk.hook(m, function(args)
+                        local found = extract_by_type(args, 8)
+                        thread.get_hook_storage().sbGuildList = found[LIST_TYPE]
+                    end, function(r)
+                        local list = thread.get_hook_storage().sbGuildList
+                        if list then pcall(filter_main_contents_list, list) end
+                        return r
+                    end)
+                end
+            end
+        end
+
+        local ctrlTd = sdk.find_type_definition(CTRL_BASE)
+        local makeM = ctrlTd and ctrlTd:get_method(MAKE_LIST)
+        if makeM then
+            sdk.hook(makeM, function(args)
+                if not live.on or PB.activeVocation ~= "stormblade" then return end
+                pcall(function()
+                    local found = extract_by_type(args, 6)
+                    local list = found[LIST_TYPE]
+                    if list then filter_main_contents_list(list) end
+                end)
+            end, function(r) return r end)
+        end
+
+        -- Rename the 5 Fighter Augments in the Vocation Guild (Mettle, Provocation, Thew, Diligence, Dominion) to Stormblade's 5 Augmentations
+        local AUG_BY_NAME = {
+            ["Mettle"]      = PB.AUGMENTS[1],
+            ["Provocation"] = PB.AUGMENTS[2],
+            ["Thew"]        = PB.AUGMENTS[3],
+            ["Diligence"]   = PB.AUGMENTS[4],
+            ["Dominion"]    = PB.AUGMENTS[5],
+        }
+        local AUG_BY_DESC = {
+            ["Augments your physical Defense."] = PB.AUGMENTS[1],
+            ["Increases the likelihood of your being targeted by foes."] = PB.AUGMENTS[2],
+            ["Enables you to carry additional weight."] = PB.AUGMENTS[3],
+            ["Hastens recovery when downed or crawling."] = PB.AUGMENTS[4],
+            ["Augments the Knockdown Power of your normal attacks."] = PB.AUGMENTS[5],
+        }
+        local function retext_stormblade_augments(this)
+            if not this or not live.on or PB.activeVocation ~= "stormblade" then return end
+            pcall(function()
+                local sl = this._Main_ContentsListCtrl
+                if sl and sl.InfoList and sl.ItemList then
+                    local infos, items = sl.InfoList, sl.ItemList
+                    for i = 0, (infos:call("get_Count") or 0) - 1 do
+                        local inf = infos[i]
+                        if inf and inf.Name then
+                            local aug = AUG_BY_NAME[tostring(inf.Name)]
+                            if aug then
+                                if inf.Id and tonumber(inf.Id) and tonumber(inf.Id) > 0 then
+                                    PB.augment_ability_ids[aug.id] = tonumber(inf.Id) & 0xFFFFFFFF
+                                end
+                                inf.Name = aug.name
+                                local it = items[inf.ItemIndex]
+                                if it and it._TxtName then it._TxtName:set_Message(aug.name) end
+                            end
+                        end
+                    end
+                end
+            end)
+            pcall(function()
+                local root = this:get_field("Root") or this.Root
+                if not root then return end
+                local function walk(c, depth)
+                    if not c or depth > 14 then return end
+                    pcall(function()
+                        if c:get_type_definition():is_a("via.gui.Text") then
+                            local msg = c:call("get_Message")
+                            if msg then
+                                local clean = tostring(msg):gsub("<[^>]*>", "")
+                                local byN = AUG_BY_NAME[clean]
+                                if byN then
+                                    c:call("set_Message", byN.name)
+                                else
+                                    local byD = AUG_BY_DESC[clean]
+                                    if byD then c:call("set_Message", byD.ui_desc) end
+                                end
+                            end
+                        end
+                    end)
+                    local ch
+                    pcall(function() ch = c:call("get_Child") end)
+                    while ch do
+                        walk(ch, depth + 1)
+                        local nx
+                        pcall(function() nx = ch:call("get_Next") end)
+                        ch = nx
+                    end
+                end
+                walk(root, 0)
+            end)
+        end
+        if uiTd then
+            for _, sig in ipairs({ "getCharaId()", "setupContents(System.Int32)", "setupAbilityInfoWindow", "setupAbilityMenu" }) do
+                local m = uiTd:get_method(sig)
+                if m then
+                    sdk.hook(m, function(args)
+                        thread.get_hook_storage().sbUiThis = sdk.to_managed_object(args[2])
+                    end, function(r)
+                        local this = thread.get_hook_storage().sbUiThis
+                        if this then retext_stormblade_augments(this) end
+                        return r
+                    end)
+                end
+            end
+        end
+    end)
+
     PB.forceArmorReapply = true
     PB.forceAugmentReapply = true
+    pcall(json.dump_file, "VSB/state/boot_guard.json", { starting = false })
+    pcall(json.dump_file, "DragonCore/boot_guard.json", { starting = false })
     re.on_script_reset(function()
+        pcall(json.dump_file, "VSB/state/boot_guard.json", { starting = false })
+        pcall(json.dump_file, "DragonCore/boot_guard.json", { starting = false })
         pcall(PB.update_stormblade_armor, true)
         pcall(PB.update_stormblade_augments, true)
+        pcall(PB.update_stormblade_guild_defs, true)
     end)
     re.on_pre_application_entry("UpdateBehavior", function()
         update_stormblade_skills()
@@ -5839,6 +6396,7 @@ end)()
     re.on_frame(function()
         pcall(PB.update_stormblade_armor, false)
         pcall(PB.update_stormblade_augments, false)
+        pcall(PB.update_stormblade_guild_defs, false)
     end)
 end)()
 
@@ -12564,21 +13122,31 @@ re.on_draw_ui(function()
         imgui.text_colored("Pactblade can't use a shield: take yours off (it can't be equipped while active).", 0xFF40C0FF)
     end
     if PB.activeVocation == "stormblade" and PB.AUGMENTS then
-        if imgui.tree_node("Stormblade Augmentations (5)") then
+        if imgui.tree_node("Stormblade Augmentations (5) & Core Skills (3)") then
             local rank = PB.stormblade_rank and PB.stormblade_rank() or 1
             local str = PB.player_strength and PB.player_strength() or 0
             local maxStam = 0
             pcall(function() maxStam = runtime.player().character:get_StaminaManager():get_MaxValue() end)
             imgui.text(("Vocation Rank: %d | Strength: %.0f | Max Stamina: %.0f"):format(rank, str, maxStam))
             local chAll
-            chAll, PB.augments_unlock_all = imgui.checkbox("Unlock all 5 Augmentations regardless of Rank (Test Mode)", PB.augments_unlock_all)
+            chAll, PB.augments_unlock_all = imgui.checkbox("Unlock all Augmentations & Core Skills regardless of Rank (Test Mode)", PB.augments_unlock_all)
             if chAll then PB.forceAugmentReapply = true end
+            imgui.text("-- Augmentations (5) --")
             for _, aug in ipairs(PB.AUGMENTS) do
                 local activeNow = PB.has_augment(aug.id)
                 local label = ("Rank %d - %s: %s [%s]"):format(aug.rank, aug.name, aug.desc, activeNow and "ACTIVE" or "LOCKED")
                 local chA
                 chA, PB.augments_enabled[aug.id] = imgui.checkbox(label .. "##sbaug_" .. aug.id, PB.augments_enabled[aug.id] ~= false)
                 if chA then PB.forceAugmentReapply = true end
+            end
+            if PB.CORE_SKILLS then
+                imgui.text("-- Core Skills (3) --")
+                for _, cs in ipairs(PB.CORE_SKILLS) do
+                    local activeNow = PB.has_core_skill and PB.has_core_skill(cs.id)
+                    local label = ("Rank %d - %s: %s [%s]"):format(cs.rank, cs.name, cs.desc, activeNow and "ACTIVE" or "LOCKED")
+                    local chC
+                    chC, PB.core_skills_enabled[cs.id] = imgui.checkbox(label .. "##sbcore_" .. cs.id, PB.core_skills_enabled[cs.id] ~= false)
+                end
             end
             imgui.tree_pop()
         end

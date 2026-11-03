@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "uuid": "7a31b412-4019-4b21-99ee-b01149e1c001",
+  "id": "sb_core_counter",
+  "kind": "core",
+  "presentation": {
+    "name": {
+      "en": "Static Counter"
+    },
+    "desc": {
+      "en": "Executing Lightning Step (RB) just as a foe strikes—or within 0.35s of an enemy blow—unleashes a high-voltage electric shockwave (1.25x Strength) that staggers attackers and grants Thunder Boon."
+    },
+    "icon": 35,
+    "sort_hint": 10
+  },
+  "availability": {
+    "list_under": "Job01",
+    "mode": "all",
+    "unlock_by": "custom"
+  },
+  "levels": {
+    "1": {
+      "unlock_rank": 2,
+      "dcp_cost": 400
+    }
+  },
+  "trigger": {
+    "type": "event",
+    "event": "passive"
+  },
+  "timeline": [
+    {
+      "id": "end_node",
+      "type": "flow",
+      "frame": 0,
+      "op": "end"
+    }
+  ]
+}

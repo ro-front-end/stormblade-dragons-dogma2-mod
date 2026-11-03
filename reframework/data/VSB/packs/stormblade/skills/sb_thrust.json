@@ -13,12 +13,14 @@
     "icon": 1
   },
   "availability": {
-    "mode": "all"
+    "list_under": "Job01",
+    "mode": "all",
+    "unlock_by": "custom"
   },
   "levels": {
     "1": {
       "unlock_rank": 1,
-      "dcp_cost": 0
+      "dcp_cost": 200
     },
     "2": {
       "unlock_rank": 4,
