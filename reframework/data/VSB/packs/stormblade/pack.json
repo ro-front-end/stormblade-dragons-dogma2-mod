@@ -16,6 +16,7 @@
             "en": "Wields a sword in one hand and lightning magick in the other. Prescinds from shields."
         },
         "enchant": "thunder_boon",
+        "icon": 37,
         "name": {
             "en": "Stormblade"
         },
@@ -24,7 +25,6 @@
             "unlock_rank": 1
         },
         "stats": {
-            "damage": 0.0,
             "defence": 2.0,
             "element_damage": {
                 "Thunder": 1.5
@@ -36,6 +36,7 @@
             "stamina_cost": -1.0
         },
         "unlock": {
+            "item_count": 1,
             "price": 0
         },
         "weapon": "Job01",
