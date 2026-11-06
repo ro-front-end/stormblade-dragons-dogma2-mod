@@ -8,7 +8,7 @@
       "en": "Storm Carve"
     },
     "desc": {
-      "en": "While clinging to or pinning a monster, every second sword strike discharges a concentrated jolt of lightning (0.85x Strength) directly into the creature's hide."
+      "en": "Striking a pinned or climbed foe repeatedly discharges lightning into their body."
     },
     "icon": 1,
     "sort_hint": 30
