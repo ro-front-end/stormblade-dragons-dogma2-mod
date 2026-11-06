@@ -302,7 +302,6 @@ pcall(function()   -- (4.04) a skill's own big drain swapped for our cost (dbg.s
 end)
 local STAMINA_TD = sdk.find_type_definition("app.StaminaManager")
 local STAMINA_ADD = STAMINA_TD and STAMINA_TD:get_method("add(System.Single, System.Boolean)")
-local STAMINA_SET_REM = STAMINA_TD and (STAMINA_TD:get_method("set_RemainingAmount(System.Single)") or STAMINA_TD:get_method("setRemainingAmount(System.Single)"))
 
 local function drain_player_stamina(a, cost)
     local smg = a and a.character and a.character:get_StaminaManager()
@@ -310,16 +309,8 @@ local function drain_player_stamina(a, cost)
     local b0 = smg:get_RemainingAmount() or 0
     if STAMINA_ADD then
         pcall(function() STAMINA_ADD:call(smg, -cost, true) end)
-    end
-    pcall(function() smg:call("add", -cost, true) end)
-    local after = smg:get_RemainingAmount() or 0
-    if after >= b0 then
-        local target = math.max(0, b0 - cost)
-        if STAMINA_SET_REM then
-            pcall(function() STAMINA_SET_REM:call(smg, target) end)
-        end
-        pcall(function() smg:set_field("<RemainingAmount>k__BackingField", target) end)
-        pcall(function() smg:set_field("_RemainingAmount", target) end)
+    else
+        pcall(function() smg:call("add", -cost, true) end)
     end
     local final = smg:get_RemainingAmount() or 0
     note(("Stormblade: Lightning Step stamina drain (b0: %.0f -> final: %.0f, cost: %.0f)"):format(b0, final, cost))
