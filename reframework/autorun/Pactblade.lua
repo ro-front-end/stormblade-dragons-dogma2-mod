@@ -5393,8 +5393,39 @@ end)()
                     note("Stormblade: Lightning Javelin hurled!")
                 end
             end
+
+            -- Responsive recovery: restore control immediately after cast completion on input or auto-timeout
+            if elapsed >= 0.28 then
+                local curAct = tostring(a:current_action(0) or "")
+                local wantsInput = false
+                pcall(function()
+                    if a.input and a.input:call("isLeverInputL") then wantsInput = true end
+                    if a:button_pressed("Attack") or a:button_pressed("HeavyAttack") or a:button_pressed("Jump") or a:button_pressed("JobSpecialAction") or a:button_pressed("AttackL") then
+                        wantsInput = true
+                    end
+                end)
+
+                if wantsInput or elapsed >= 0.40 or (curAct ~= "Job07_MagicBindComplete" and curAct ~= "") then
+                    if curAct == "Job07_MagicBindComplete" then
+                        pcall(function()
+                            a:request_action(a:is_grounded() == false and "WaitToFall" or "NormalLocomotion", 0)
+                        end)
+                    end
+                    pcall(function()
+                        if a.character and a.character.FullBodyLayer then
+                            a.character.FullBodyLayer:call("set_PlaySpeed", 1.0)
+                        end
+                    end)
+                    PB.javelin_active = false
+                end
+            end
             if elapsed >= 0.75 then
                 PB.javelin_active = false
+                pcall(function()
+                    if a.character and a.character.FullBodyLayer then
+                        a.character.FullBodyLayer:call("set_PlaySpeed", 1.0)
+                    end
+                end)
             end
         end
 
