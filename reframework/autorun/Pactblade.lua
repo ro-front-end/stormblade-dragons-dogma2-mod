@@ -300,6 +300,36 @@ pcall(function()   -- (4.04) a skill's own big drain swapped for our cost (dbg.s
         end)
     end, function(r) return r end)
 end)
+local STAMINA_TD = sdk.find_type_definition("app.StaminaManager")
+local STAMINA_ADD = STAMINA_TD and STAMINA_TD:get_method("add(System.Single, System.Boolean)")
+local STAMINA_SET_REM = STAMINA_TD and (STAMINA_TD:get_method("set_RemainingAmount(System.Single)") or STAMINA_TD:get_method("setRemainingAmount(System.Single)"))
+
+local function drain_player_stamina(a, cost)
+    local smg = a and a.character and a.character:get_StaminaManager()
+    if not smg then return false end
+    local b0 = smg:get_RemainingAmount() or 0
+    if STAMINA_ADD then
+        pcall(function() STAMINA_ADD:call(smg, -cost, true) end)
+    end
+    pcall(function() smg:call("add", -cost, true) end)
+    local after = smg:get_RemainingAmount() or 0
+    if after >= b0 then
+        local target = math.max(0, b0 - cost)
+        if STAMINA_SET_REM then
+            pcall(function() STAMINA_SET_REM:call(smg, target) end)
+        end
+        pcall(function() smg:set_field("<RemainingAmount>k__BackingField", target) end)
+        pcall(function() smg:set_field("_RemainingAmount", target) end)
+    end
+    local final = smg:get_RemainingAmount() or 0
+    note(("Stormblade: Lightning Step stamina drain (b0: %.0f -> final: %.0f, cost: %.0f)"):format(b0, final, cost))
+    if final <= 0 then
+        pcall(function() smg:call("setTired", true) end)
+        pcall(function() smg:call("setIsTired", true) end)
+    end
+    return true
+end
+
 function dbg.stam_cost(a, what, cost)
     if PB.activeVocation == "stormblade" and PB.has_augment and PB.has_augment("eye_of_hurricane") then
         cost = math.floor(cost * 0.90 + 0.5)
@@ -1710,22 +1740,7 @@ update_body = function()
                 if st.dodgeYaw then face_yaw(a, st.dodgeYaw) end
                 a:request_action(PB.DODGE, 0)
 
-                -- Deduct stamina directly using verified REFramework API (setRemainingAmount)
-                local newStam = curStam
-                pcall(function()
-                    local smg = a.character and a.character:get_StaminaManager()
-                    if smg then
-                        local b0 = smg:get_RemainingAmount() or curStam
-                        newStam = math.max(0, b0 - cost)
-                        smg:call("setRemainingAmount(System.Single)", newStam)
-                        pcall(function() smg:call("add(System.Single, System.Boolean)", -cost, true) end)
-                        if newStam <= 0 then
-                            pcall(function() smg:call("setTired(System.Boolean)", true) end)
-                            pcall(function() smg:call("setIsTired(System.Boolean)", true) end)
-                        end
-                    end
-                end)
-                note(("Stormblade: Lightning Step quickstep executed (cost: %.0f, remaining: %.0f)"):format(cost, newStam))
+                drain_player_stamina(a, cost)
                 return
             end
             local win = cfg.burstWindow
