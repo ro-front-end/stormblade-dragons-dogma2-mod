@@ -1681,10 +1681,14 @@ update_body = function()
                 local curStam = a:stamina() or 0
                 local isExhausted = false
                 pcall(function()
-                    if a.character and a.character.get_StaminaManager then
+                    if a.character then
                         local smg = a.character:get_StaminaManager()
-                        if smg and smg.call and (smg:call("isTired") or smg:call("get_IsTired") or smg:call("get_isTired")) then
-                            isExhausted = true
+                        if smg then
+                            local rem = smg:get_RemainingAmount()
+                            if rem and rem <= 5 then isExhausted = true end
+                            if smg.call and (smg:call("isTired") or smg:call("get_IsTired") or smg:call("get_isTired")) then
+                                isExhausted = true
+                            end
                         end
                     end
                 end)
@@ -1705,8 +1709,23 @@ update_body = function()
                 st.dodgeYaw = stick_yaw(a)
                 if st.dodgeYaw then face_yaw(a, st.dodgeYaw) end
                 a:request_action(PB.DODGE, 0)
-                pcall(a.consume_stamina, a, cost)
-                note(("Stormblade: Lightning Step quickstep executed (cost: %.0f, remaining: %.0f)"):format(cost, (a:stamina() or 0)))
+
+                -- Deduct stamina directly using verified REFramework API (setRemainingAmount)
+                local newStam = curStam
+                pcall(function()
+                    local smg = a.character and a.character:get_StaminaManager()
+                    if smg then
+                        local b0 = smg:get_RemainingAmount() or curStam
+                        newStam = math.max(0, b0 - cost)
+                        smg:call("setRemainingAmount(System.Single)", newStam)
+                        pcall(function() smg:call("add(System.Single, System.Boolean)", -cost, true) end)
+                        if newStam <= 0 then
+                            pcall(function() smg:call("setTired(System.Boolean)", true) end)
+                            pcall(function() smg:call("setIsTired(System.Boolean)", true) end)
+                        end
+                    end
+                end)
+                note(("Stormblade: Lightning Step quickstep executed (cost: %.0f, remaining: %.0f)"):format(cost, newStam))
                 return
             end
             local win = cfg.burstWindow
