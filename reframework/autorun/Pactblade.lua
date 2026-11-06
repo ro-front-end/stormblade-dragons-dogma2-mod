@@ -247,7 +247,7 @@ local trace = {}
 -- debug files: written at most every 2 s (each write is disk I/O on the game thread - a stutter per hit / warp)
 dbg.files, dbg.filesAt = {}, 0
 function dbg.save(name, data) dbg.files[name] = data end
-local AIR_NO = { "rope", "rappel", "climb", "hang", "ladder", "cling", "grab", "catch", "dmg", "damage", "down", "blown", "die", "dead", "swim", "carry" }
+local AIR_NO = { "rope", "rappel", "climb", "hang", "ladder", "cling", "grab", "catch", "dmg", "damage", "down", "blown", "die", "dead", "swim", "carry", "fatigue", "tired", "exhaust", "breath", "gasp" }
 function dbg.air_ok(a)   -- (3.65) in the air from a real jump / fall / air attack - not on a rope, climbing, hurt
     local cur = tostring(a:current_action(0) or ""):lower()
     for _, w in ipairs(AIR_NO) do if cur:find(w, 1, true) then return false, cur end end
@@ -1673,13 +1673,40 @@ update_body = function()
         if busyNow and a:button_pressed("JobSpecialAction") then note("vocation button: not now (" .. tostring(busyCur) .. ")") end
         if a:button_pressed("JobSpecialAction") and not st.pending and not busyNow then
             if PB.activeVocation == "stormblade" then
-                -- Lightning Step: Pure agile dodge on RB, no palm projectile
+                -- Lightning Step: Agile dodge on RB gated by stamina and exhaustion
+                local cost = 100
+                if PB.has_augment and PB.has_augment("eye_of_hurricane") then
+                    cost = 90
+                end
+                local curStam = a:stamina() or 0
+                local isExhausted = false
+                pcall(function()
+                    if a.character and a.character.get_StaminaManager then
+                        local smg = a.character:get_StaminaManager()
+                        if smg and smg.call and (smg:call("isTired") or smg:call("get_IsTired") or smg:call("get_isTired")) then
+                            isExhausted = true
+                        end
+                    end
+                end)
+                if not isExhausted then
+                    local curAct = tostring(a:current_action(0) or ""):lower()
+                    for _, kw in ipairs({"fatigue", "tired", "exhaust", "breath", "gasp"}) do
+                        if curAct:find(kw, 1, true) then isExhausted = true; break end
+                    end
+                end
+
+                if isExhausted or curStam < cost then
+                    note(("Stormblade: Lightning Step blocked (stamina: %.0f/%.0f, exhausted: %s)"):format(curStam, cost, tostring(isExhausted)))
+                    return
+                end
+
                 st.dodgeT = now
                 st.dodgeUntil = now + 0.3
                 st.dodgeYaw = stick_yaw(a)
                 if st.dodgeYaw then face_yaw(a, st.dodgeYaw) end
                 a:request_action(PB.DODGE, 0)
-                note("Stormblade: Lightning Step quickstep executed")
+                pcall(a.consume_stamina, a, cost)
+                note(("Stormblade: Lightning Step quickstep executed (cost: %.0f, remaining: %.0f)"):format(cost, (a:stamina() or 0)))
                 return
             end
             local win = cfg.burstWindow

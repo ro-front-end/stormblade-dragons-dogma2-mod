@@ -13,7 +13,7 @@
 
 1. **Bare-Handed Spellcasting (No Shield):**
    * Prescinds entirely from heavy shields. The left hand remains free to channel agile evasions, palm strikes, and lightning magic.
-   * `RB` (*JobSpecialAction*) executes **`Lightning Step`**: a pure, ultra-fast directional quickstep/dodge with electric sparks, replacing vanilla blocking with zero animation lock or stance freezes.
+   * `RB` (*JobSpecialAction*) executes **`Lightning Step`**: a pure, ultra-fast directional quickstep/dodge with electric sparks (costs 100 stamina, 90 with *Eye of Hurricane*; blocked while exhausted), replacing vanilla blocking with zero animation lock or stance freezes.
    * `Triangle` / `Y` / `R-Click` (*Heavy Attack*) executes a **Dual Off-Hand Magic System**:
      * **Tap (< 350ms) — Vanilla Heavy Stab & Downed Finisher:** 100% native Fighter heavy stab (`Job01_HeavyAttack`) and grounded finisher (`FinishingMove` / `DownAttack`) with zero animation stutter, no stamina drain, and zero unwanted projectile release.
      * **Hold (>= 350ms, or >= 180ms with *Tempest Overcharge*) — Close-Range Levin Strike:** Channels crackling electricity and calls down a localized Levin lightning bolt (`shell_id = 8`, `1.40x` Strength, `Hitback_M`) with zero cheesy stun lock and 100% EXP/loot retention.
