@@ -16,7 +16,7 @@
    * `RB` (*JobSpecialAction*) executes **`Lightning Step`**: a pure, ultra-fast directional quickstep/dodge with electric sparks, replacing vanilla blocking with zero animation lock or stance freezes.
    * `Triangle` / `Y` / `R-Click` (*Heavy Attack*) executes a **Dual Off-Hand Magic System**:
      * **Tap (< 350ms) — Vanilla Heavy Stab & Downed Finisher:** 100% native Fighter heavy stab (`Job01_HeavyAttack`) and grounded finisher (`FinishingMove` / `DownAttack`) with zero animation stutter, no stamina drain, and zero unwanted projectile release.
-     * **Hold (>= 350ms, or >= 180ms with *Tempest Overcharge*) — Close-Range Levin Strike:** Channels crackling electricity and calls down a localized Levin lightning bolt (`shell_id = 8`, `1.85x` Strength, `Hitback_M`) with zero cheesy stun lock and 100% EXP/loot retention.
+     * **Hold (>= 350ms, or >= 180ms with *Tempest Overcharge*) — Close-Range Levin Strike:** Channels crackling electricity and calls down a localized Levin lightning bolt (`shell_id = 8`, `1.40x` Strength, `Hitback_M`) with zero cheesy stun lock and 100% EXP/loot retention.
 2. **Native Light Armor Wardrobe (`PB.update_stormblade_armor`):**
    * Dynamically enables **500 Light & Medium armors** (*Archer*, *Mage*, *Thief*, *Mystic Spearhand*, *Magick Archer*, and universal cloaks) while blocking **169 Heavy Plate & Chain Mail armors** (*Fighter*, *Warrior*) across all shops and equipment menus, with full Save & Online Guard restoration.
 3. **Curated Spellsword Repertoire & Clean Vocation Guild:**

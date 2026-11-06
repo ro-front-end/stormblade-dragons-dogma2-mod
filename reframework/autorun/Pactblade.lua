@@ -3313,7 +3313,7 @@ pcall(function()
                 row.elemental = info.NonMagicElementDamage
                 if PB.activeVocation == "stormblade" and (kind == "charged" or kind == "tap" or kind == "burst" or kind == "bind" or kind == "levin" or kind == "nova" or kind == "thunderstrike" or kind == "javelin" or kind == "slash" or kind == "static_counter" or kind == "storm_carve" or kind == "omnislash") then
                     local str = PB.player_strength()
-                    local mul = (kind == "javelin" and 1.85) or (kind == "static_counter" and 1.25) or (kind == "storm_carve" and 0.85) or (kind == "omnislash" and 1.65) or (kind == "thunderstrike" and 0.60) or (kind == "levin" and 3.2) or (kind == "nova" and 2.0) or (kind == "charged" and 2.2) or (kind == "burst" and 1.5) or (kind == "slash" and 1.0) or 1.0
+                    local mul = (kind == "javelin" and 1.40) or (kind == "static_counter" and 1.25) or (kind == "storm_carve" and 0.85) or (kind == "omnislash" and 1.65) or (kind == "thunderstrike" and 0.60) or (kind == "levin" and 3.2) or (kind == "nova" and 2.0) or (kind == "charged" and 2.2) or (kind == "burst" and 1.5) or (kind == "slash" and 1.0) or 1.0
                     local rate = (kind == "thunderstrike" or kind == "javelin" or kind == "slash" or kind == "static_counter" or kind == "storm_carve" or kind == "omnislash") and 1.0 or (info.DamageRate or 1)
                     local overloadMul = (PB.overload_mul and PB.overload_mul(info, true)) or 1.0
                     local dmg = math.floor(str * mul * rate * overloadMul)
