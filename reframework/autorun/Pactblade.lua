@@ -304,7 +304,7 @@ local STAMINA_TD = sdk.find_type_definition("app.StaminaManager")
 local STAMINA_ADD = STAMINA_TD and STAMINA_TD:get_method("add(System.Single, System.Boolean)")
 local STAMINA_SET_REM = STAMINA_TD and (STAMINA_TD:get_method("set_RemainingAmount(System.Single)") or STAMINA_TD:get_method("setRemainingAmount(System.Single)"))
 
-local function drain_player_stamina(a, cost)
+local function drain_player_stamina(a, cost, label)
     local smg = a and a.character and a.character:get_StaminaManager()
     if not smg then return false end
     local b0 = smg:get_RemainingAmount() or 0
@@ -320,12 +320,38 @@ local function drain_player_stamina(a, cost)
     pcall(function() smg:set_field("<RemainingAmount>k__BackingField", target) end)
 
     local final = smg:get_RemainingAmount() or target
-    note(("Stormblade: Lightning Step stamina drain (b0: %.0f -> final: %.0f, cost: %.0f)"):format(b0, final, cost))
+    note(("Stormblade: %s stamina drain (b0: %.0f -> final: %.0f, cost: %.0f)"):format(label or "Lightning Step", b0, final, cost))
     if target <= 0 then
         pcall(function() smg:call("setTired", true) end)
         pcall(function() smg:call("setIsTired", true) end)
     end
     return true
+end
+PB.drain_stamina = drain_player_stamina
+function PB.check_stamina(a, cost)
+    local curStam = 0
+    local isExhausted = false
+    pcall(function()
+        curStam = a and a:stamina() or 0
+        local smg = a and a.character and a.character:get_StaminaManager()
+        if smg then
+            local rem = smg:get_RemainingAmount()
+            if rem then
+                curStam = rem
+                if rem <= 5 then isExhausted = true end
+            end
+            if smg.call and (smg:call("isTired") or smg:call("get_IsTired") or smg:call("get_isTired")) then
+                isExhausted = true
+            end
+        end
+    end)
+    if not isExhausted and a then
+        local curAct = tostring(a:current_action(0) or ""):lower()
+        for _, kw in ipairs({"fatigue", "tired", "exhaust", "breath", "gasp"}) do
+            if curAct:find(kw, 1, true) then isExhausted = true; break end
+        end
+    end
+    return (not isExhausted and curStam >= cost), curStam, isExhausted
 end
 
 function dbg.stam_cost(a, what, cost)
@@ -2997,7 +3023,10 @@ local function sword_update()
     if dbg.guardHold then return end   -- (4.98) a save / an online upload is being built: the sword stays plain
     if os.clock() - lastSword < 0.5 then return end
     lastSword = os.clock()
-    if PB.activeVocation == "stormblade" then return end
+    if PB.activeVocation == "stormblade" then
+        if swordMod then sword_restore(); held_restore() end
+        return
+    end
     if not live.on then sword_restore(); held_restore(); return end
     pcall(held_apply)
     if swordEl.dirty and swordMod then
@@ -3852,8 +3881,22 @@ pcall(function()
                     local b = blast_of(info:get_AttackHitController())
                     if b and BLAST[b.kind].flinchOnly then s2.pbCap = info end
                 end
-                if PB.activeVocation == "stormblade" and PB.javelinT and (os.clock() - PB.javelinT < 3.0) then
-                    s2.pbJavelin = info
+                if PB.activeVocation == "stormblade" and PB.javelinT and (os.clock() - PB.javelinT < 1.8) and live.go then
+                    local ahc = info:get_AttackHitController()
+                    local go = ahc and ahc:get_GameObject()
+                    if go and go:get_address() ~= live.go then
+                        local owner = nil
+                        pcall(function() owner = ahc:get_CachedOwner() end)
+                        if not owner then
+                            pcall(function()
+                                local sh = go:call("getComponent(System.Type)", sdk.typeof("app.Shell"))
+                                owner = sh and sh:get_AttackOwner()
+                            end)
+                        end
+                        if owner and owner:get_address() == live.go then
+                            s2.pbJavelin = info
+                        end
+                    end
                 end
             end)
         end, function(r)
@@ -5320,22 +5363,22 @@ end)()
         if not a or not a:valid() then return end
         local now = os.clock()
         -- Heavy attack (Triangle / Y):
-        -- Quick tap (< 0.35s) = 100% vanilla Fighter Heavy stab / Downed finisher (Untouched, no stutter, no delay!)
-        -- Hold (>= 0.35s) = Stormblade Lightning Javelin Charge & Throw (No catapulting Unto Heven!)
+        -- Quick tap (< 0.48s) = 100% vanilla Fighter Heavy stab / Downed finisher (Untouched, no stutter, no delay!)
+        -- Hold (>= 0.48s, or >= 0.28s with Tempest Overcharge) = Stormblade Lightning Javelin Charge & Throw (35 Stamina)
         local cur_act = a:current_action(0) or ""
         local is_finisher = cur_act:find("FinishingMove") or cur_act:find("DownAttack")
 
-        -- Core Skill 2: Tempest Overcharge (Rank 4) - Light sword slashes grant 2.5s of 2x faster Heavy Levin charge (0.18s vs 0.35s)
+        -- Core Skill 2: Tempest Overcharge (Rank 4) - Light sword slashes grant 2.5s of faster Heavy Levin charge (0.28s vs 0.48s)
         if cur_act == "Job01_AttackLeft" or cur_act == "Job01_AttackRight" or cur_act == "Job01_AttackAir" or cur_act:find("^Job01_ComboAttack") or cur_act:find("^Job01_JustAttack") then
             PB.tempestOverchargeUntil = now + 2.5
         end
 
-        -- Core Skill 1: Static Counter (Rank 2) - Electric discharge when executing Lightning Step (RB) within 0.35s of an enemy blow or in close combat
-        if a:button_pressed("JobSpecialAction") or (cur_act == PB.DODGE and (now - (PB.lastDodgeAt or 0) > 0.35)) then
+        -- Core Skill 1: Static Counter (Rank 2) - Electric discharge ONLY when an actual Lightning Step (RB) dodge executes against an incoming blow or active attacker
+        if cur_act == PB.DODGE and (now - (PB.lastDodgeAt or 0) > 0.35) then
             PB.lastDodgeAt = now
             if PB.has_core_skill and PB.has_core_skill("counter") then
-                local recentHit = (now - (PB.lastGotHitAt or 0)) <= 0.35
-                local closeThreat = false
+                local recentHit = (now - (PB.lastGotHitAt or 0)) <= 0.45
+                local activeThreat = false
                 if not recentHit then
                     pcall(function()
                         local t = dbg.beam and dbg.beam.aim_pick and dbg.beam.aim_pick(a, 0.22)
@@ -5343,28 +5386,36 @@ end)()
                             local p1 = a.character:get_GameObject():get_Transform():get_Position()
                             local p2 = t:get_GameObject():get_Transform():get_Position()
                             local dx, dz = p1.x - p2.x, p1.z - p2.z
-                            if (dx * dx + dz * dz) <= (4.2 * 4.2) then closeThreat = true end
+                            if (dx * dx + dz * dz) <= (3.2 * 3.2) then
+                                local am = t:get_ActionManager()
+                                local e0 = am and am.CurrentActionList and am.CurrentActionList[0]
+                                local nm = tostring(e0 and e0.Name or "")
+                                if nm:find("Attack") or nm:find("Atk") or nm:find("Strike") or nm:find("Slash")
+                                   or nm:find("Bite") or nm:find("Tackle") or nm:find("Rush") or nm:find("Grab")
+                                   or nm:find("Claw") or nm:find("Swing") or nm:find("Breath") or nm:find("Shoot") then
+                                    activeThreat = true
+                                end
+                            end
                         end
                     end)
                 end
-                if recentHit or closeThreat then
+                if recentHit or activeThreat then
                     pcall(PB.trigger_static_counter, a)
                 end
             end
         end
 
-        -- Core Skill 3: Storm Carve (Rank 6) - Bonus lightning shock every 2nd sword strike while clinging/climbing or pinning a monster
+        -- Core Skill 3: Storm Carve (Rank 6) - Bonus lightning shock every 3rd sword strike while clinging/climbing or pinning a monster
         if PB.has_core_skill and PB.has_core_skill("carve") then
             local isClingAtk = cur_act:find("CatchAttack") ~= nil or cur_act:find("AttackHold") ~= nil or cur_act:find("HoldAttack") ~= nil
             if isClingAtk then
-                local motKey = cur_act
                 pcall(function()
                     local L = a.character.FullBodyLayer
                     local fr = L and L:call("get_Frame") or 0
-                    if fr < 8 and (now - (PB.lastCarveSwingAt or 0) > 0.32) then
+                    if fr < 8 and (now - (PB.lastCarveSwingAt or 0) > 0.55) then
                         PB.lastCarveSwingAt = now
                         PB.carveSwingCount = (PB.carveSwingCount or 0) + 1
-                        if (PB.carveSwingCount % 2) == 0 and PB.trigger_storm_carve then
+                        if (PB.carveSwingCount % 3) == 0 and PB.trigger_storm_carve then
                             pcall(PB.trigger_storm_carve, a)
                         end
                     end
@@ -5372,7 +5423,7 @@ end)()
             end
         end
 
-        local reqHold = (PB.has_core_skill and PB.has_core_skill("overcharge") and now <= (PB.tempestOverchargeUntil or 0)) and 0.18 or 0.35
+        local reqHold = (PB.has_core_skill and PB.has_core_skill("overcharge") and now <= (PB.tempestOverchargeUntil or 0)) and 0.28 or 0.48
         if a:button_down("AttackL") and not is_finisher then
             if not PB.heavy_hold_t0 then
                 PB.heavy_hold_t0 = now
@@ -5386,23 +5437,36 @@ end)()
             end
         else
             if PB.heavy_charge and PB.heavy_charge.phase == "charged" then
-                -- Player released after a full charge: Unleash Lightning Javelin!
+                -- Player released after a full charge: check stamina & cadence before unleashing Lightning Javelin!
                 PB.heavy_charge.phase = "idle"
                 PB.heavy_hold_t0 = nil
-                -- Use clean forward cast/throw (Job07_MagicBindComplete), NEVER Unto Heven's baseball catapult!
-                pcall(function()
-                    a:request_action("Job07_MagicBindComplete", 0)
-                end)
-                pcall(function()
-                    if a.character and a.character.FullBodyLayer then
-                        a.character.FullBodyLayer:call("set_PlaySpeed", 1.4)
-                    end
-                end)
-                PB.javelin_active = true
-                PB.javelin_t0 = now
-                PB.javelinT = now
-                PB.javelin_spawned = false
-                note("Stormblade: Lightning Javelin unleashed from charged release!")
+                local javCost = (PB.has_augment and PB.has_augment("eye_of_hurricane")) and 32 or 35
+                local canCast, curStam, isExh = true, 999, false
+                if PB.check_stamina then
+                    canCast, curStam, isExh = PB.check_stamina(a, javCost)
+                end
+                if now - (PB.lastJavelinCastAt or 0) < 0.90 then
+                    note("Stormblade: Lightning Javelin on brief recovery cooldown")
+                elseif not canCast then
+                    note(("Stormblade: Lightning Javelin blocked (stamina: %.0f/%.0f, exhausted: %s)"):format(curStam, javCost, tostring(isExh)))
+                else
+                    PB.lastJavelinCastAt = now
+                    drain_player_stamina(a, javCost, "Lightning Javelin")
+                    -- Use clean forward cast/throw (Job07_MagicBindComplete), NEVER Unto Heven's baseball catapult!
+                    pcall(function()
+                        a:request_action("Job07_MagicBindComplete", 0)
+                    end)
+                    pcall(function()
+                        if a.character and a.character.FullBodyLayer then
+                            a.character.FullBodyLayer:call("set_PlaySpeed", 1.35)
+                        end
+                    end)
+                    PB.javelin_active = true
+                    PB.javelin_t0 = now
+                    PB.javelinT = now
+                    PB.javelin_spawned = false
+                    note("Stormblade: Lightning Javelin unleashed from charged release!")
+                end
             else
                 -- Released without charging: Reset timer, normal heavy stab finishes cleanly
                 PB.heavy_charge = nil
@@ -5683,10 +5747,10 @@ end)()
 
     -- 4. Stormblade 5 Rank-Scaled Augmentations (Fulmination, Conductivity, Aegis of the Storm, Overload, Eye of the Hurricane)
     PB.AUGMENTS = {
-        { id = "fulmination",      rank = 2, dcp = 300,  vanilla_name = "Mettle",      name = "Fulmination",          desc = "+30 Strength (physical & lightning scaling) (300 Dcp)", ui_desc = "Increases your physical and lightning Strength by +30 while wielding a sword as a Stormblade." },
+        { id = "fulmination",      rank = 2, dcp = 300,  vanilla_name = "Mettle",      name = "Fulmination",          desc = "+15 Strength & +15 Magick (300 Dcp)",                    ui_desc = "Increases your Strength and Magick by +15 while wielding a sword as a Stormblade." },
         { id = "conductivity",     rank = 4, dcp = 900,  vanilla_name = "Provocation", name = "Conductivity",         desc = "+150 Max Stamina (900 Dcp)",                            ui_desc = "Bio-electrical conditioning increases your Maximum Stamina by +150." },
         { id = "aegis",            rank = 6, dcp = 1800, vanilla_name = "Thew",        name = "Aegis of the Storm",   desc = "+45 Magick Defense (1800 Dcp)",                          ui_desc = "Wards your body with an electrostatic veil, increasing your Magick Defense by +45." },
-        { id = "overload",         rank = 8, dcp = 3000, vanilla_name = "Diligence",   name = "Overload",             desc = "+20% Thunder damage vs Weak / Drenched targets (3000 Dcp)", ui_desc = "Increases Thunder damage by +20% when striking monster weakpoints or drenched and shocked foes." },
+        { id = "overload",         rank = 8, dcp = 3000, vanilla_name = "Diligence",   name = "Overload",             desc = "+12% Thunder damage vs Weak / Drenched targets (3000 Dcp)", ui_desc = "Increases Thunder damage by +12% when striking monster weakpoints or drenched and shocked foes." },
         { id = "eye_of_hurricane", rank = 9, dcp = 5000, vanilla_name = "Dominion",    name = "Eye of the Hurricane", desc = "-10% Stamina cost on skills (5000 Dcp)",                 ui_desc = "Calm focus at the center of the storm reduces the Stamina cost of all skills by 10%." },
     }
     PB.augment_ability_ids = {}
@@ -5709,23 +5773,19 @@ end)()
     function PB.stormblade_rank()
         local vr = nil
         pcall(function()
-            local vp = package.loaded["VSB.game.vocprogress"]
+            local vp = package.loaded["VSB.game.vocprogress"] or require("VSB.game.vocprogress")
             if vp and vp.rank_of_pack then
                 vr = tonumber(vp.rank_of_pack("stormblade"))
             end
-        end)
-        if vr and vr >= 1 then return vr end
-        local r = 1
-        pcall(function()
-            local a = runtime.player()
-            local human = a and a.character and a.character:get_Human()
-            local jc = human and human["<JobContext>k__BackingField"]
-            if jc then
-                local jr = tonumber(jc:call("calcJobRank(app.Character.JobEnum)", 1))
-                if jr and jr > r then r = jr end
+            if (not vr or vr < 1) and vp and vp.points_of then
+                local prog = package.loaded["VSB.core.progression"] or require("VSB.core.progression")
+                if prog and prog.rank_from_points then
+                    vr = tonumber(prog.rank_from_points({ progression = { difficulty = 2.2 } }, vp.points_of("stormblade")))
+                end
             end
         end)
-        return r
+        if vr and vr >= 1 then return vr end
+        return 1
     end
 
     function PB.has_augment(id)
@@ -5749,7 +5809,7 @@ end)()
         return true
     end
 
-    -- Overload (Rank 8): +20% Thunder damage on weak-point or drenched/tarred targets
+    -- Overload (Rank 8): +12% Thunder damage on weak-point or drenched/tarred targets
     function PB.overload_mul(info, isThunder)
         if not PB.has_augment("overload") or not isThunder or not info then return 1.0 end
         local boost = false
@@ -5775,8 +5835,8 @@ end)()
             end)
         end
         if boost then
-            note("Stormblade Overload: +20% Thunder damage triggered!")
-            return 1.20
+            note("Stormblade Overload: +12% Thunder damage triggered!")
+            return 1.12
         end
         return 1.0
     end
@@ -5825,19 +5885,18 @@ end)()
         end
     end)
 
-    -- Fulmination (Rank 2: +30 Strength) & Aegis of the Storm (Rank 6: +45 Magick Defense)
-    -- Applied cleanly to the equipped weapon / armor parameters and PlayerAttackDefenceStatus so Status & Equipment menus show them natively!
+    -- Fulmination (Rank 2: +15 Strength & +15 Magick via Stormblade/weapons.lua) & Aegis of the Storm (Rank 6: +45 Magick Defense)
     local sbAugMod = { sword = nil, armor = nil, lastCheck = 0 }
     PB.sbAugMod = sbAugMod
 
     local function restore_sb_aug_items()
         local changed = false
-        if sbAugMod.sword then
-            local m = sbAugMod.sword
-            pcall(function() m.param._PhysicalAttack = m.origAtk end)
-            if m.own then pcall(function() m.own._PhysicalAttack = m.origOwnAtk end) end
-            sbAugMod.sword = nil
-            changed = true
+        if _G.SB_FULMINATION_BONUS and _G.SB_FULMINATION_BONUS ~= 0 then
+            _G.SB_FULMINATION_BONUS = 0
+            pcall(function()
+                local w = package.loaded["Stormblade.weapons"]
+                if w and w.update then w.update() end
+            end)
         end
         if sbAugMod.armor then
             local m = sbAugMod.armor
@@ -5852,8 +5911,9 @@ end)()
     end
 
     function PB.update_stormblade_augments(forceRestore)
+        _G.SB_SAVE_GUARD = (forceRestore or dbg.guardHold) and true or false
         if forceRestore or dbg.guardHold or not live.on or PB.activeVocation ~= "stormblade" then
-            if sbAugMod.sword or sbAugMod.armor then
+            if (_G.SB_FULMINATION_BONUS and _G.SB_FULMINATION_BONUS ~= 0) or sbAugMod.armor then
                 restore_sb_aug_items()
                 note("Stormblade Augmentations: restored base weapon/armor stats")
             end
@@ -5872,45 +5932,15 @@ end)()
         local wantAegis = PB.has_augment("aegis")
         local needRefresh = false
 
-        -- 1. Fulmination (+30 Strength on equipped main sword)
-        local wid = held_weapon_id()
-        if wantFulm and wid then
-            local okP, param = pcall(function() return im:call("getItemData(app.WeaponID)", wid) end)
-            if okP and param then
-                if sbAugMod.sword and sbAugMod.sword.id ~= wid then
-                    local old = sbAugMod.sword
-                    pcall(function() old.param._PhysicalAttack = old.origAtk end)
-                    if old.own then pcall(function() old.own._PhysicalAttack = old.origOwnAtk end) end
-                    sbAugMod.sword = nil
-                end
-                if not sbAugMod.sword then
-                    local origAtk = param._PhysicalAttack or 0
-                    local ownObj, origOwnAtk = nil, nil
-                    pcall(function()
-                        local sd = dbg.main_weapon_sd()
-                        local o = sd and sd:get_field("_ItemData")
-                        if o and o:get_address() ~= param:get_address() and o:get_field("_PhysicalAttack") ~= nil then
-                            ownObj = o:add_ref()
-                            origOwnAtk = o._PhysicalAttack
-                        end
-                    end)
-                    sbAugMod.sword = { id = wid, param = param:add_ref(), origAtk = origAtk, own = ownObj, origOwnAtk = origOwnAtk }
-                    param._PhysicalAttack = origAtk + 30
-                    if ownObj then ownObj._PhysicalAttack = origOwnAtk + 30 end
-                    needRefresh = true
-                    note(("Stormblade Fulmination: Sword Strength %d -> %d (+30)"):format(origAtk, origAtk + 30))
-                elseif param._PhysicalAttack ~= (sbAugMod.sword.origAtk + 30) then
-                    param._PhysicalAttack = sbAugMod.sword.origAtk + 30
-                    if sbAugMod.sword.own then sbAugMod.sword.own._PhysicalAttack = sbAugMod.sword.origOwnAtk + 30 end
-                    needRefresh = true
-                end
-            end
-        elseif sbAugMod.sword then
-            local old = sbAugMod.sword
-            pcall(function() old.param._PhysicalAttack = old.origAtk end)
-            if old.own then pcall(function() old.own._PhysicalAttack = old.origOwnAtk end) end
-            sbAugMod.sword = nil
-            needRefresh = true
+        -- 1. Fulmination (+15 Strength & +15 Magick delegated cleanly to Stormblade/weapons.lua so there is zero stat ping-pong)
+        local targetBonus = wantFulm and 15 or 0
+        if (_G.SB_FULMINATION_BONUS or 0) ~= targetBonus then
+            _G.SB_FULMINATION_BONUS = targetBonus
+            pcall(function()
+                local w = package.loaded["Stormblade.weapons"]
+                if w and w.update then w.update() end
+            end)
+            note(("Stormblade Fulmination: hybrid weapon bonus set to +%d Strength / +%d Magick"):format(targetBonus, targetBonus))
         end
 
         -- 2. Aegis of the Storm (+45 Magick Defense on equipped armor piece)
@@ -5966,11 +5996,11 @@ end)()
         end
 
         if needRefresh then
-            pcall(refresh_equipment, sbAugMod.sword and sbAugMod.sword.param and sbAugMod.sword.param._Id or nil)
+            pcall(refresh_equipment, nil)
         end
     end
 
-    -- Also hook PlayerStatusCalculator & PlayerAttackDefenceStatus so the Status Screen shows +30 Strength & +45 Magick Defense even if unarmored or paused!
+    -- Also hook PlayerStatusCalculator & PlayerAttackDefenceStatus so the Status Screen shows +15/+15 & +45 Magick Defense even if unarmored/unarmed!
     local sbStatDone = {}
     local function apply_sb_status_calc(st)
         if not st or not live.on or PB.activeVocation ~= "stormblade" then return end
@@ -5978,11 +6008,13 @@ end)()
         local now = os.clock()
         if sbStatDone[addr] and (now - sbStatDone[addr] < 0.05) then return end
         sbStatDone[addr] = now
-        -- If no sword item mod is active yet, add +30 to AdditionalAttack
-        if PB.has_augment("fulmination") and not sbAugMod.sword then
+        -- Only add +15/+15 here when unarmed (when a sword is held, Stormblade/weapons.lua already applies +15/+15 on the weapon)
+        if PB.has_augment("fulmination") and not held_weapon_id() then
             pcall(function()
                 local aa = st:get_field("<AdditionalAttack>k__BackingField") or 0
-                st:set_field("<AdditionalAttack>k__BackingField", aa + 30)
+                st:set_field("<AdditionalAttack>k__BackingField", aa + 15)
+                local ma = st:get_field("<AdditionalMagicAttack>k__BackingField") or 0
+                st:set_field("<AdditionalMagicAttack>k__BackingField", ma + 15)
             end)
         end
         -- If no armor item mod is active yet, add +45 to AdditionalMagicDefence
@@ -6016,9 +6048,9 @@ end)()
 
     -- 5. Stormblade 3 Core Skills (Static Counter, Tempest Overcharge, Storm Carve) + Omnislash Stage Helper
     PB.CORE_SKILLS = {
-        { id = "counter",    rank = 2, dcp = 400,  uuid = "7a31b412-4019-4b21-99ee-b01149e1c001", name = "Static Counter",     desc = "Lightning Step (RB) parry shockwave (1.25x Strength) + Thunder Boon (400 Dcp)" },
-        { id = "overcharge", rank = 4, dcp = 900,  uuid = "7a31b412-4019-4b21-99ee-b01149e1c002", name = "Tempest Overcharge", desc = "Light sword slashes halve Heavy Levin charge time (0.35s -> 0.18s) (900 Dcp)" },
-        { id = "carve",      rank = 6, dcp = 1500, uuid = "7a31b412-4019-4b21-99ee-b01149e1c003", name = "Storm Carve",        desc = "Every 2nd climbing/pinning slash triggers a 0.85x lightning jolt (1500 Dcp)" },
+        { id = "counter",    rank = 2, dcp = 400,  uuid = "7a31b412-4019-4b21-99ee-b01149e1c001", name = "Static Counter",     desc = "Reactive RB dodge parry shockwave (0.80x, 2.5s cd) + Thunder Boon (400 Dcp)" },
+        { id = "overcharge", rank = 4, dcp = 900,  uuid = "7a31b412-4019-4b21-99ee-b01149e1c002", name = "Tempest Overcharge", desc = "Light sword slashes accelerate Heavy Javelin charge (0.48s -> 0.28s) (900 Dcp)" },
+        { id = "carve",      rank = 6, dcp = 1500, uuid = "7a31b412-4019-4b21-99ee-b01149e1c003", name = "Storm Carve",        desc = "Every 3rd climbing/pinning slash triggers a 0.65x lightning jolt (1500 Dcp)" },
     }
     PB.core_skills_enabled = {
         counter = true,
@@ -6063,7 +6095,7 @@ end)()
 
     function PB.trigger_static_counter(a)
         local now = os.clock()
-        if now - (PB.lastStaticCounterAt or 0) < 1.2 then return end
+        if now - (PB.lastStaticCounterAt or 0) < 2.5 then return end
         a = a or runtime.player()
         if not a or not a:valid() then return end
         PB.lastStaticCounterAt = now
@@ -6090,7 +6122,7 @@ end)()
 
     function PB.trigger_storm_carve(a)
         local now = os.clock()
-        if now - (PB.lastStormCarveAt or 0) < 0.35 then return end
+        if now - (PB.lastStormCarveAt or 0) < 0.50 then return end
         a = a or runtime.player()
         if not a or not a:valid() then return end
         PB.lastStormCarveAt = now
@@ -12625,8 +12657,13 @@ end)()
     dbg.guard = G
     local function strip(why)
         dbg.guardHold = true
+        _G.SB_SAVE_GUARD = true
         G.stripAt = os.clock()
         pcall(sword_restore)
+        pcall(function()
+            local w = package.loaded["Stormblade.weapons"]
+            if w and w.restore then w.restore() end
+        end)
         if PB.update_stormblade_armor then pcall(PB.update_stormblade_armor, true) end
         if PB.update_stormblade_augments then pcall(PB.update_stormblade_augments, true) end
         G.chestWas = false
@@ -12639,6 +12676,7 @@ end)()
     end
     local function apply()
         dbg.guardHold = false   -- the sword re-applies itself (sword_update, within 0.5 s)
+        _G.SB_SAVE_GUARD = false
         if G.chestWas then
             G.chestWas = false
             pcall(function() local gu = dbg.guise; if gu and gu.on and gu.bonus.on then gu.armour_bonus(true) end end)
@@ -12690,7 +12728,7 @@ end)()
         return n == "registerSupportPawnUploadData" or n == "registerSupportPawnDismissal" or n == "registerSupportPawnLeaveParty"
             or n == "registerSupportPawnLost"
     end)
-    re.on_script_reset(function() dbg.guardHold = false end)
+    re.on_script_reset(function() dbg.guardHold = false; _G.SB_SAVE_GUARD = false end)
     -- (1.0.2 user: Bolt / Blast / Slash wave did ~no damage = the sword stayed plain: a save's end never came) the guard
     -- lets go by itself after 5 s - a save / an upload build takes far less
     re.on_frame(function()
