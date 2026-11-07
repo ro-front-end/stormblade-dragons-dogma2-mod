@@ -29,7 +29,7 @@
   },
   "costs": {
     "stamina": {
-      "amount": 160,
+      "amount": 150,
       "at_frame": 0
     }
   },
@@ -71,7 +71,7 @@
       "until": 120,
       "super_armor": true,
       "element": "Thunder",
-      "attack_rate": 1.35
+      "attack_rate": 0.95
     }
   ]
 }

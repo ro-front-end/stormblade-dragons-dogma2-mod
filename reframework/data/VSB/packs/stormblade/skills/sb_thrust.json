@@ -27,6 +27,12 @@
       "dcp_cost": 1000
     }
   },
+  "costs": {
+    "stamina": {
+      "amount": 95,
+      "at_frame": 0
+    }
+  },
   "conditions": {
     "grounded": true,
     "not_carrying": true,
@@ -57,7 +63,7 @@
       "until": 40,
       "super_armor": true,
       "element": "Thunder",
-      "attack_rate": 1.3
+      "attack_rate": 1.0
     },
     {
       "id": "thrust_spark",
@@ -73,7 +79,7 @@
         "lock_range": 15.0
       },
       "element": "Thunder",
-      "attack_rate": 0.2,
+      "attack_rate": 0.30,
       "color": [50, 180, 255, 255],
       "enabled": true
     }
