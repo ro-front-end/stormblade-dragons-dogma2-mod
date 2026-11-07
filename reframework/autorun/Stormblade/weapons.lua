@@ -1,18 +1,16 @@
 -- ==============================================================================
 -- Stormblade / weapons.lua
--- Spellsword Hybrid Scaling: 70% Physical Attack + 45% Magick Attack + Thunder
--- Balanced against dual defense checks, matching Fighter & Warrior damage output
+-- Spellsword Hybrid Scaling: 70% Physical + 65% Magick + Unsheathed Thunder Boon
+-- Balanced for +30% agile attack speed without double weapon-element dipping
 -- ==============================================================================
 
 local core = require("Stormblade.core")
 local weapons = {}
 
-local THUNDER_ELEMENT = 3
-local FULL_STORE = 100
-
--- Balanced Ratios: 70% physical + 45% magick = 115% combined base power
+-- Balanced Ratios: 70% physical (agile 1H fast-cadence weight) + 65% magick (scales shells & boon natively)
+-- Weapon _Element is preserved (not forced to 3) so unsheathed Thunder Boon doesn't double-dip on light slashes
 local PHYS_RATIO = 0.70
-local MAG_RATIO = 0.45
+local MAG_RATIO = 0.65
 
 -- Active sword backup to guarantee clean restore
 local backup = nil -- { param, id, itemId, original_phys, original_mag, original_el, original_store, own }
@@ -96,7 +94,7 @@ end
 
 --- Applies Spellblade Thunder scaling to the currently held sword
 function weapons.update()
-    if not core.is_active() then
+    if not core.is_active() or _G.SB_SAVE_GUARD then
         if backup then weapons.restore() end
         return
     end
@@ -107,20 +105,29 @@ function weapons.update()
         return
     end
 
-    -- Target values based on original weapon stats
-    local target_phys = backup and math.max(1, math.floor(backup.original_phys * PHYS_RATIO)) or nil
-    local target_mag = backup and math.max(1, math.floor(backup.original_phys * MAG_RATIO)) or nil
+    local fulm = tonumber(_G.SB_FULMINATION_BONUS) or 0
 
     -- If weapon is already modified and still matches, verify parameters haven't reset
     if backup and backup.id == weapon_id then
+        local target_phys = math.max(1, math.floor(backup.original_phys * PHYS_RATIO)) + fulm
+        local target_mag = math.max(backup.original_mag or 0, math.floor(backup.original_phys * MAG_RATIO)) + fulm
         ensure_thunder_boon()
         pcall(function()
             local p = backup.param
-            if p._PhysicalAttack ~= target_phys or p._MagicAttack ~= target_mag or p._Element ~= THUNDER_ELEMENT then
+            local o = backup.own and backup.own.obj
+            local need = (p._PhysicalAttack ~= target_phys or p._MagicAttack ~= target_mag)
+            if o then
+                local o_phys = math.max(1, math.floor(backup.own.phys * PHYS_RATIO)) + fulm
+                local o_mag = math.max(backup.own.mag or 0, math.floor(backup.own.phys * MAG_RATIO)) + fulm
+                if o._PhysicalAttack ~= o_phys or o._MagicAttack ~= o_mag then
+                    o._PhysicalAttack = o_phys
+                    o._MagicAttack = o_mag
+                    need = true
+                end
+            end
+            if need then
                 p._PhysicalAttack = target_phys
                 p._MagicAttack = target_mag
-                p._Element = THUNDER_ELEMENT
-                p._ElementStore = FULL_STORE
                 refresh_character_equipment(backup.itemId)
             end
         end)
@@ -146,11 +153,29 @@ function weapons.update()
         original_store = param._ElementStore,
     }
 
-    -- Apply balanced Spellblade formula: 70% Physical, 45% Magick, Element = Thunder
-    param._PhysicalAttack = math.max(1, math.floor(backup.original_phys * PHYS_RATIO))
-    param._MagicAttack = math.max(1, math.floor(backup.original_phys * MAG_RATIO))
-    param._Element = THUNDER_ELEMENT
-    param._ElementStore = FULL_STORE
+    pcall(function()
+        local player = core.get_player()
+        local ed = player and player.character and im:call("getEquipData(app.Character)", player.character)
+        local data = ed and ed:get_field("Data")
+        local main_slot = sdk.find_type_definition("app.EquipData.SlotEnum"):get_field("Main"):get_data(nil)
+        local sd = data and data:call("get(app.EquipData.SlotEnum)", main_slot)
+        local own = sd and sd:get_field("_ItemData")
+        if own and own:get_address() ~= param:get_address() and own:get_field("_PhysicalAttack") ~= nil then
+            backup.own = {
+                obj = own:add_ref(),
+                phys = own._PhysicalAttack,
+                mag = own._MagicAttack,
+                el = own._Element,
+                store = own._ElementStore,
+            }
+            own._PhysicalAttack = math.max(1, math.floor(backup.own.phys * PHYS_RATIO)) + fulm
+            own._MagicAttack = math.max(backup.own.mag or 0, math.floor(backup.own.phys * MAG_RATIO)) + fulm
+        end
+    end)
+
+    -- Apply balanced Spellblade formula: 70% Physical, 65% Magick (no forced _Element to avoid double-dipping with Thunder Boon)
+    param._PhysicalAttack = math.max(1, math.floor(backup.original_phys * PHYS_RATIO)) + fulm
+    param._MagicAttack = math.max(backup.original_mag or 0, math.floor(backup.original_phys * MAG_RATIO)) + fulm
 
     refresh_character_equipment(backup.itemId)
     ensure_thunder_boon()
