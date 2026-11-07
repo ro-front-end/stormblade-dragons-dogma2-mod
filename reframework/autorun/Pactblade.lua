@@ -3307,13 +3307,19 @@ pcall(function()
                 end)
             end
             if not s.pbKind and PB.activeVocation == "stormblade" then
-                if PB.staticCounterT and os.clock() - PB.staticCounterT < 1.5 then s.pbKind = "static_counter"
-                elseif PB.stormCarveT and os.clock() - PB.stormCarveT < 1.5 then s.pbKind = "storm_carve"
-                elseif PB.omnislashT and os.clock() - PB.omnislashT < 2.5 then s.pbKind = "omnislash"
-                elseif PB.thunderstrikeT and os.clock() - PB.thunderstrikeT < 2.0 then s.pbKind = "thunderstrike"
-                elseif PB.javelinT and os.clock() - PB.javelinT < 2.5 then s.pbKind = "javelin"
-                elseif PB.levinT and os.clock() - PB.levinT < 3.5 then s.pbKind = "levin"
-                elseif PB.novaT and os.clock() - PB.novaT < 2.5 then s.pbKind = "nova" end
+                pcall(function()
+                    local hc = info:get_AttackHitController()
+                    local go = hc and hc:get_GameObject()
+                    if go and go:get_address() ~= live.go and go:call("getComponent(System.Type)", sdk.typeof("app.Shell")) then
+                        if PB.staticCounterT and os.clock() - PB.staticCounterT < 1.0 then s.pbKind = "static_counter"
+                        elseif PB.stormCarveT and os.clock() - PB.stormCarveT < 0.8 then s.pbKind = "storm_carve"
+                        elseif PB.omnislashT and os.clock() - PB.omnislashT < 2.0 then s.pbKind = "omnislash"
+                        elseif PB.thunderstrikeT and os.clock() - PB.thunderstrikeT < 1.2 then s.pbKind = "thunderstrike"
+                        elseif PB.javelinT and os.clock() - PB.javelinT < 1.8 then s.pbKind = "javelin"
+                        elseif PB.levinT and os.clock() - PB.levinT < 2.5 then s.pbKind = "levin"
+                        elseif PB.novaT and os.clock() - PB.novaT < 2.0 then s.pbKind = "nova" end
+                    end
+                end)
             end
             if combo.stage == 4 and not combo.finalHit then combo.finalHit = true; note("final strike hit") end
             if combo.stage == 1 and not combo.target then
@@ -3371,17 +3377,22 @@ pcall(function()
                 row.enchant = info.EnchantDamage
                 row.elemental = info.NonMagicElementDamage
                 if PB.activeVocation == "stormblade" and (kind == "charged" or kind == "tap" or kind == "burst" or kind == "bind" or kind == "levin" or kind == "nova" or kind == "thunderstrike" or kind == "javelin" or kind == "slash" or kind == "static_counter" or kind == "storm_carve" or kind == "omnislash") then
-                    local str = PB.player_strength()
-                    local mul = (kind == "javelin" and 1.40) or (kind == "static_counter" and 1.25) or (kind == "storm_carve" and 0.85) or (kind == "omnislash" and 1.65) or (kind == "thunderstrike" and 0.60) or (kind == "levin" and 3.2) or (kind == "nova" and 2.0) or (kind == "charged" and 2.2) or (kind == "burst" and 1.5) or (kind == "slash" and 1.0) or 1.0
-                    local rate = (kind == "thunderstrike" or kind == "javelin" or kind == "slash" or kind == "static_counter" or kind == "storm_carve" or kind == "omnislash") and 1.0 or (info.DamageRate or 1)
+                    -- Scale DD2's native defense-mitigated & Hard-Mode-adjusted `before` (NEVER bypass defense with raw Strength!)
+                    local mul = (kind == "javelin" and 0.90)
+                             or (kind == "slash" and 1.80)
+                             or (kind == "static_counter" and 0.80)
+                             or (kind == "storm_carve" and 0.65)
+                             or (kind == "omnislash" and 0.75)
+                             or (kind == "thunderstrike" and 0.80)
+                             or (kind == "levin" and 1.15)
+                             or (kind == "nova" and 1.10)
+                             or (kind == "charged" and 1.00)
+                             or (kind == "burst" and 0.85)
+                             or 0.85
                     local overloadMul = (PB.overload_mul and PB.overload_mul(info, true)) or 1.0
-                    local dmg = math.floor(str * mul * rate * overloadMul)
+                    local baseDmg = tonumber(before) or 0
+                    local dmg = baseDmg > 0 and math.max(1, math.floor(baseDmg * mul * overloadMul + 0.5)) or 0
                     info.Damage = dmg
-                    pcall(function() info.IsMagicAttack = true end)
-                    pcall(function() info.MagicDamage = dmg end)
-                    pcall(function() info.EnchantDamage = 0 end)
-                    pcall(function() info.NonMagicElementDamage = dmg end)
-                    pcall(function() info.SlashDamage = 0; info.ShootDamage = 0; info.StrikeDamage = 0 end)
                     if kind == "javelin" then
                         pcall(function()
                             info.DamageType = 6                     -- Hitback_M (clean flinch impact, NO stun / NO knockdown)
@@ -3419,13 +3430,11 @@ pcall(function()
                         end)
                     else
                         pcall(function() info.DamageType = 6; info.DamageActType = 6; info.IsDirectDamageEnableAllDamageType = true end)
-                        pcall(function() info.DamageReaction = (kind == "thunderstrike" and 350) or (kind == "charged" and 450) or 250 end)
+                        pcall(function() info.DamageReaction = (kind == "thunderstrike" and 180) or (kind == "charged" and 220) or 140 end)
                     end
                     pcall(function() info:call("set_ElementType", 3) end)
-                    pcall(function() if info["<AttackUserData>k__BackingField"] then info["<AttackUserData>k__BackingField"]:set_field("_ElementType", 3) end end)
-                    row.kind = (kind == "slash" and "Arc Slash (wave)") or (kind == "javelin" and "Lightning Javelin") or (kind == "thunderstrike" and "Thunderstrike") or (kind == "levin" and "Levin Storm") or (kind == "nova" and "Nova Electrica") or ("Storm Bolt (" .. tostring(kind) .. ")")
-                    dbg.boltMag = str
-                    note(("Stormblade %s hit: %.0f lightning damage (strength %.0f x%.2f)"):format(row.kind, dmg, str, mul))
+                    row.kind = (kind == "slash" and "Arc Slash (wave)") or (kind == "javelin" and "Lightning Javelin") or (kind == "static_counter" and "Static Counter") or (kind == "storm_carve" and "Storm Carve") or (kind == "omnislash" and "Omnislash") or (kind == "thunderstrike" and "Thunderstrike") or (kind == "levin" and "Levin Storm") or (kind == "nova" and "Nova Electrica") or ("Storm Bolt (" .. tostring(kind) .. ")")
+                    note(("Stormblade %s hit: %.0f lightning damage (native %.0f x%.2f)"):format(row.kind, dmg, baseDmg, mul))
                 elseif kind == "bind" then
                     info.Damage = 1
                     row.kind = "Forbeding Bolt"
@@ -3436,15 +3445,15 @@ pcall(function()
                 elseif kind and live.on and BLAST[kind].factor then
                     local base = mag > 0 and mag or (phys + mag)
                     info.Damage = base * (info.DamageRate or 1) * BLAST[kind].factor
-                elseif live.on and phys + mag > 0 then
+                elseif live.on and PB.activeVocation ~= "stormblade" and phys + mag > 0 then
                     info.Damage = before * (phys * PB.PHYS_BONUS + mag * PB.MAG_BONUS) / (phys + mag)
                 end
                 if kind and live.on and BLAST[kind] and BLAST[kind].dmgMul and PB.activeVocation ~= "stormblade" then info.Damage = info.Damage * BLAST[kind].dmgMul end
                 if not kind and live.on and combo.slash and combo.slash.on then
                     if PB.activeVocation == "stormblade" then
-                        local str = PB.player_strength()
                         local overloadMul = (PB.overload_mul and PB.overload_mul(info, true)) or 1.0
-                        info.Damage = math.floor(str * 1.0 * overloadMul)
+                        local baseSword = tonumber(before) or 0
+                        info.Damage = baseSword > 0 and math.max(1, math.floor(baseSword * 1.0 * overloadMul + 0.5)) or 0
                         row.kind = "Arc Slash (sword)"
                     else
                         info.Damage = info.Damage * (combo.slash.swordMul or 2)
