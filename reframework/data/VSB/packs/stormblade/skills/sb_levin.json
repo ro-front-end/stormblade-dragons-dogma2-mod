@@ -27,6 +27,17 @@
       "dcp_cost": 4000
     }
   },
+  "costs": {
+    "stamina": {
+      "amount": 135,
+      "at_frame": 0
+    }
+  },
+  "conditions": {
+    "grounded": true,
+    "not_carrying": true,
+    "not_restricted": true
+  },
   "trigger": {
     "type": "slot"
   },
@@ -65,7 +76,7 @@
         "lock_range": 35,
         "face": "crosshair"
       },
-      "attack_rate": 3.6,
+      "attack_rate": 1.15,
       "element": "Thunder",
       "damage_type": "Hitback_L",
       "color": [50, 180, 255, 255],
@@ -84,7 +95,7 @@
         "face": "crosshair"
       },
       "element": "Thunder",
-      "attack_rate": 0.7,
+      "attack_rate": 0.25,
       "color": [50, 180, 255, 255],
       "enabled": true
     }

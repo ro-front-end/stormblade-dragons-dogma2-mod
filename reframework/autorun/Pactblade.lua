@@ -4295,10 +4295,20 @@ local function combo_update(a)
     if combo.want then
         combo.want = false
         if combo.stage == 0 then
+            if PB.activeVocation == "stormblade" and PB.check_stamina then
+                local cost = (PB.has_augment and PB.has_augment("eye_of_hurricane")) and 225 or COMBO_STAMINA
+                local canCast, curStam, isExh = PB.check_stamina(a, cost)
+                if not canCast then
+                    note(("Stormblade: Omnislash blocked (stamina: %.0f/%.0f, exhausted: %s)"):format(curStam, cost, tostring(isExh)))
+                    return
+                end
+                if PB.drain_stamina then PB.drain_stamina(a, cost, "Omnislash: Raijin") end
+            else
+                pcall(a.consume_stamina, a, COMBO_STAMINA)
+            end
             combo.target = nil
             combo.t0 = now
             comboFx.seen, comboFx.list = {}, {}
-            pcall(a.consume_stamina, a, COMBO_STAMINA)
             combo.aim, combo.aimT, combo.used = nil, now, nil
             if cfg.comboTurn and combo.pick_target then
                 local ok, t, d = pcall(combo.pick_target, a, cfg.comboTurnRange, cfg.comboTurnCone)
@@ -5024,7 +5034,17 @@ local function slash_update(a)
     if slash.want then
         slash.want = false
         if not slash.on and combo.stage == 0 then
-            pcall(a.consume_stamina, a, SLASH.stamina)
+            if PB.activeVocation == "stormblade" and PB.check_stamina then
+                local cost = (PB.has_augment and PB.has_augment("eye_of_hurricane")) and 113 or 125
+                local canCast, curStam, isExh = PB.check_stamina(a, cost)
+                if not canCast then
+                    note(("Stormblade: Arc Slash blocked (stamina: %.0f/%.0f, exhausted: %s)"):format(curStam, cost, tostring(isExh)))
+                    return
+                end
+                if PB.drain_stamina then PB.drain_stamina(a, cost, "Arc Slash") end
+            else
+                pcall(a.consume_stamina, a, SLASH.stamina)
+            end
             slash.on, slash.asked, slash.started, slash.fired = true, now, nil, false
             pcall(function() a:set_super_armor(true); slash.armor = true end)
             pcall(function() slash.prevMot = motion_key(a.character.FullBodyLayer) end)

@@ -27,6 +27,12 @@
       "dcp_cost": 5000
     }
   },
+  "costs": {
+    "stamina": {
+      "amount": 165,
+      "at_frame": 0
+    }
+  },
   "conditions": {
     "grounded": true,
     "not_carrying": true,
@@ -65,7 +71,7 @@
       "until": 60,
       "super_armor": true,
       "element": "Thunder",
-      "attack_rate": 1.5,
+      "attack_rate": 1.0,
       "damage_type": "Hitback_L"
     },
     {
@@ -82,7 +88,7 @@
         "lock_range": 5.0
       },
       "element": "Thunder",
-      "attack_rate": 0.5,
+      "attack_rate": 0.25,
       "color": [50, 180, 255, 255],
       "enabled": true
     },
@@ -100,7 +106,7 @@
         "lock_range": 5.0
       },
       "element": "Thunder",
-      "attack_rate": 1.8,
+      "attack_rate": 0.95,
       "damage_type": "Hitback_L",
       "color": [50, 180, 255, 255],
       "enabled": true
@@ -119,7 +125,7 @@
         "lock_range": 5.0
       },
       "element": "Thunder",
-      "attack_rate": 1.4,
+      "attack_rate": 0.45,
       "damage_type": "Hitback_L",
       "color": [50, 180, 255, 255],
       "enabled": true
@@ -138,10 +144,10 @@
         "lock_range": 5.0
       },
       "element": "Thunder",
-      "attack_rate": 1.2,
+      "attack_rate": 0.35,
       "damage_type": "Hitback_L",
       "color": [50, 180, 255, 255],
-      "enabled": true
+      "enabled": false
     }
   ]
 }
