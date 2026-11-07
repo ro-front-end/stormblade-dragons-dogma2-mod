@@ -15,13 +15,12 @@
         "description": {
             "en": "Wields a sword in one hand and lightning magick in the other. Prescinds from shields."
         },
-        "enchant": "thunder_boon",
         "icon": 37,
         "name": {
             "en": "Stormblade"
         },
         "progression": {
-            "difficulty": 1,
+            "difficulty": 2.2,
             "unlock_rank": 1
         },
         "stats": {

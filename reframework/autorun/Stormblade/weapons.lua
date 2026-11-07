@@ -54,8 +54,14 @@ local function ensure_thunder_boon()
     if not player or not player:valid() or not player.character then return end
     pcall(function()
         local statuses = require("DragonCore.game.statuses")
-        if not statuses.active(player.character, "thunder_boon") then
-            statuses.apply(player.character, "thunder_boon")
+        if player:weapon_drawn() then
+            if not statuses.active(player.character, "thunder_boon") then
+                statuses.apply(player.character, "thunder_boon")
+            end
+        else
+            if statuses.active(player.character, "thunder_boon") then
+                statuses.cure(player.character, "thunder_boon")
+            end
         end
     end)
 end

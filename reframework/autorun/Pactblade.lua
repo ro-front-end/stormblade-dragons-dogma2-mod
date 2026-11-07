@@ -302,19 +302,26 @@ pcall(function()   -- (4.04) a skill's own big drain swapped for our cost (dbg.s
 end)
 local STAMINA_TD = sdk.find_type_definition("app.StaminaManager")
 local STAMINA_ADD = STAMINA_TD and STAMINA_TD:get_method("add(System.Single, System.Boolean)")
+local STAMINA_SET_REM = STAMINA_TD and (STAMINA_TD:get_method("set_RemainingAmount(System.Single)") or STAMINA_TD:get_method("setRemainingAmount(System.Single)"))
 
 local function drain_player_stamina(a, cost)
     local smg = a and a.character and a.character:get_StaminaManager()
     if not smg then return false end
     local b0 = smg:get_RemainingAmount() or 0
+    local target = math.max(0, b0 - cost)
+
     if STAMINA_ADD then
         pcall(function() STAMINA_ADD:call(smg, -cost, true) end)
-    else
-        pcall(function() smg:call("add", -cost, true) end)
     end
-    local final = smg:get_RemainingAmount() or 0
+    pcall(function() smg:call("add", -cost, true) end)
+    if STAMINA_SET_REM then
+        pcall(function() STAMINA_SET_REM:call(smg, target) end)
+    end
+    pcall(function() smg:set_field("<RemainingAmount>k__BackingField", target) end)
+
+    local final = smg:get_RemainingAmount() or target
     note(("Stormblade: Lightning Step stamina drain (b0: %.0f -> final: %.0f, cost: %.0f)"):format(b0, final, cost))
-    if final <= 0 then
+    if target <= 0 then
         pcall(function() smg:call("setTired", true) end)
         pcall(function() smg:call("setIsTired", true) end)
     end
@@ -5489,12 +5496,18 @@ end)()
             end)
         end
 
-        -- Maintain native Thunder Boon crackling electricity on the sword
-        if a.character and a:weapon_drawn() then
+        -- Maintain native Thunder Boon crackling electricity on the sword ONLY when unsheathed
+        if a.character then
             pcall(function()
                 local st = require("DragonCore.game.statuses")
-                if not st.active(a.character, "thunder_boon") then
-                    st.apply(a.character, "thunder_boon")
+                if a:weapon_drawn() then
+                    if not st.active(a.character, "thunder_boon") then
+                        st.apply(a.character, "thunder_boon")
+                    end
+                else
+                    if st.active(a.character, "thunder_boon") then
+                        st.cure(a.character, "thunder_boon")
+                    end
                 end
             end)
         end

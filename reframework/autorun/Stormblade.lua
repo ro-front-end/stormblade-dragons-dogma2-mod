@@ -50,6 +50,20 @@ re.on_draw_ui(function()
             imgui.text("Attack Speed: +30% Chain")
             imgui.text("Dodge: Lightning Step (RB)")
             imgui.text("Heavy Attack: Thunderstrike (Off-Hand Palm)")
+            pcall(function()
+                local vp = require("VSB.game.vocprogress")
+                local prog = require("VSB.core.progression")
+                local pts = vp and vp.points_of and vp.points_of("stormblade") or 0
+                local r = prog and prog.rank_from_points and prog.rank_from_points({ progression = { difficulty = 2.2 } }, pts) or 1
+                imgui.text(string.format("Rank: %d  |  DCP Points: %d", r, pts))
+                if imgui.button("Reset Stormblade to Rank 1 (0 Points)") then
+                    local s = vp.snapshot and vp.snapshot() or { points = {} }
+                    if s and s.points then
+                        s.points.stormblade = 0
+                        vp.set(s)
+                    end
+                end
+            end)
         else
             imgui.text("Equip a sword and pick Stormblade in VSB to activate.")
         end
