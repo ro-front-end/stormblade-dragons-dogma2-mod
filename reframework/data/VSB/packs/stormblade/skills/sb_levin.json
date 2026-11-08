@@ -29,8 +29,9 @@
   },
   "costs": {
     "stamina": {
-      "amount": 135,
-      "at_frame": 0
+      "amount": 110,
+      "at_frame": 0,
+      "lvl1_mult": 1.35
     }
   },
   "conditions": {
