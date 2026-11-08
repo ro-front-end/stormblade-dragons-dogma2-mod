@@ -5884,20 +5884,35 @@ end)()
         end
     end)
 
-    -- Eye of the Hurricane (Rank 9): -10% Stamina Cost via app.HumanStaminaController:Chara_OnConsumeStaminaHandler
+    -- Native motion-track stamina calibration & Eye of the Hurricane (Rank 9: -10% Stamina Cost)
+    -- Scales Job07_DanceOfDeath (Wild Furie Maister motion: -74 x 7 = -518) down to Rank 4 Tempest Flurry (~24 x 7 = ~166 total),
+    -- and prevents duplicate motion-track drains while script-managed Omnislash / Arc Slash are active.
     pcall(function()
         local hscTd = sdk.find_type_definition("app.HumanStaminaController")
         local consumeM = hscTd and hscTd:get_method("Chara_OnConsumeStaminaHandler(System.Single, app.StaminaParameterBase.Parameter)")
         if consumeM then
             sdk.hook(consumeM, function(args)
-                if not PB.has_augment("eye_of_hurricane") then return end
+                if not live.on or PB.activeVocation ~= "stormblade" then return end
                 pcall(function()
                     local this = sdk.to_managed_object(args[2])
                     local owner = this and this["Chara"]
                     if owner and live.go and owner:get_GameObject():get_address() == live.go then
                         local v = sdk.to_float(args[3])
                         if v > 0 then
-                            args[3] = sdk.float_to_ptr(v * 0.90)
+                            local mul = 1.0
+                            local a = runtime.player()
+                            local cur = a and a:current_action(0) or ""
+                            if (combo and combo.stage and combo.stage > 0) or (combo and combo.slash and combo.slash.on) then
+                                mul = 0.0
+                            elseif cur == "Job07_DanceOfDeath" then
+                                mul = mul * 0.32
+                            end
+                            if mul > 0 and PB.has_augment("eye_of_hurricane") then
+                                mul = mul * 0.90
+                            end
+                            if mul ~= 1.0 then
+                                args[3] = sdk.float_to_ptr(v * mul)
+                            end
                         end
                     end
                 end)

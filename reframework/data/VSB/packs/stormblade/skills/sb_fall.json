@@ -27,14 +27,9 @@
       "dcp_cost": 5000
     }
   },
-  "costs": {
-    "stamina": {
-      "amount": 165,
-      "at_frame": 0
-    }
-  },
   "conditions": {
     "grounded": true,
+    "min_stamina": 130,
     "not_carrying": true,
     "not_restricted": true
   },
