@@ -3406,9 +3406,7 @@ pcall(function()
                 row.enchant = info.EnchantDamage
                 row.elemental = info.NonMagicElementDamage
                 if PB.activeVocation == "stormblade" and (kind == "charged" or kind == "tap" or kind == "burst" or kind == "bind" or kind == "levin" or kind == "nova" or kind == "thunderstrike" or kind == "javelin" or kind == "slash" or kind == "static_counter" or kind == "storm_carve" or kind == "omnislash") then
-                    -- Scale DD2's native defense-mitigated & Hard-Mode-adjusted `before` (NEVER bypass defense with raw Strength!)
-                    local mul = (kind == "javelin" and 0.90)
-                             or (kind == "slash" and 1.80)
+                    local mul = (kind == "slash" and 1.80)
                              or (kind == "static_counter" and 0.80)
                              or (kind == "storm_carve" and 0.65)
                              or (kind == "omnislash" and 0.75)
@@ -3420,8 +3418,22 @@ pcall(function()
                              or 0.85
                     local overloadMul = (PB.overload_mul and PB.overload_mul(info, true)) or 1.0
                     local baseDmg = tonumber(before) or 0
-                    local dmg = baseDmg > 0 and math.max(1, math.floor(baseDmg * mul * overloadMul + 0.5)) or 0
-                    info.Damage = dmg
+                    local dmg = 0
+
+                    if kind == "javelin" then
+                        -- Javelin: JobMagic shell 8 has 0 native damage; scale balanced from player Strength
+                        local str = (PB.player_strength and PB.player_strength()) or 120
+                        dmg = math.max(1, math.floor(str * 0.95 * overloadMul + 0.5))
+                        info.Damage = dmg
+                        pcall(function() info.IsMagicAttack = true end)
+                        pcall(function() info.MagicDamage = dmg end)
+                        pcall(function() info.EnchantDamage = 0 end)
+                        pcall(function() info.NonMagicElementDamage = dmg end)
+                        pcall(function() info.SlashDamage = 0; info.ShootDamage = 0; info.StrikeDamage = 0 end)
+                    else
+                        dmg = baseDmg > 0 and math.max(1, math.floor(baseDmg * mul * overloadMul + 0.5)) or 0
+                        info.Damage = dmg
+                    end
                     if kind == "javelin" then
                         pcall(function()
                             info.DamageType = 6                     -- Hitback_M (clean flinch impact, NO stun / NO knockdown)
