@@ -474,6 +474,7 @@ function dbg.press_ok() return not dbg.INTEGRATED or (dbg.pbDepth or 0) > 0 end
             if vid and fid then m[math.tointeger(vid) or vid] = { kind = kind, fid = fid }; n = n + 1 end
         end
         A.map, A.found = m, n
+        A.judgementId = ids["7a31b412-4019-4b21-99ee-b01149e1a008"] and (math.tointeger(ids["7a31b412-4019-4b21-99ee-b01149e1a008"]) or ids["7a31b412-4019-4b21-99ee-b01149e1a008"]) or 142
         A.info = ("%d / 8 Pactblade skills known to VSB"):format(n)
     end
     local function translate(args, idx)
@@ -484,6 +485,9 @@ function dbg.press_ok() return not dbg.INTEGRATED or (dbg.pbDepth or 0) > 0 end
         if not live.on then return end
         pcall(A.refresh)
         local id = id0
+        if PB.activeVocation == "stormblade" and id == (A.judgementId or 142) then
+            PB.judgementT = os.clock()
+        end
         local e = A.map[id]
         if not e then return end
         note(("adapter: %s (VSB %d) -> Fighter id %d"):format(e.kind, id, e.fid))
@@ -1831,7 +1835,8 @@ pcall(function()
         function(args)
             if not live.on or ourSpawn then return end
             local beamAir = dbg.beam and dbg.beam.stage == "air"
-            if not beamAir and os.clock() - lastFire > 1.5 then return end
+            local javSuppress = PB.activeVocation == "stormblade" and (PB.javelin_active or (PB.lastJavelinCastAt and os.clock() - PB.lastJavelinCastAt < 1.2))
+            if not beamAir and not javSuppress and os.clock() - lastFire > 1.5 then return end
             local owner = sdk.to_managed_object(args[3])
             if owner and owner:get_address() == live.go and beamAir then
                 dbg.suppressed = dbg.suppressed + 1
@@ -3345,6 +3350,7 @@ pcall(function()
                         elseif PB.omnislashT and os.clock() - PB.omnislashT < 2.0 then s.pbKind = "omnislash"
                         elseif PB.thunderstrikeT and os.clock() - PB.thunderstrikeT < 1.2 then s.pbKind = "thunderstrike"
                         elseif PB.javelinT and os.clock() - PB.javelinT < 1.8 then s.pbKind = "javelin"
+                        elseif PB.judgementT and os.clock() - PB.judgementT < 2.8 then s.pbKind = "judgement"
                         elseif PB.levinT and os.clock() - PB.levinT < 2.5 then s.pbKind = "levin"
                         elseif PB.novaT and os.clock() - PB.novaT < 2.0 then s.pbKind = "nova" end
                     end
@@ -3405,7 +3411,7 @@ pcall(function()
                 end)
                 row.enchant = info.EnchantDamage
                 row.elemental = info.NonMagicElementDamage
-                if PB.activeVocation == "stormblade" and (kind == "charged" or kind == "tap" or kind == "burst" or kind == "bind" or kind == "levin" or kind == "nova" or kind == "thunderstrike" or kind == "javelin" or kind == "slash" or kind == "static_counter" or kind == "storm_carve" or kind == "omnislash") then
+                if PB.activeVocation == "stormblade" and (kind == "charged" or kind == "tap" or kind == "burst" or kind == "bind" or kind == "levin" or kind == "nova" or kind == "thunderstrike" or kind == "javelin" or kind == "judgement" or kind == "slash" or kind == "static_counter" or kind == "storm_carve" or kind == "omnislash") then
                     local mul = (kind == "slash" and 1.80)
                              or (kind == "static_counter" and 0.80)
                              or (kind == "storm_carve" and 0.65)
@@ -3420,10 +3426,11 @@ pcall(function()
                     local baseDmg = tonumber(before) or 0
                     local dmg = 0
 
-                    if kind == "javelin" then
-                        -- Javelin: JobMagic shell 8 has 0 native damage; scale balanced from player Strength
+                    if kind == "javelin" or kind == "judgement" then
+                        -- Javelin & Judgement: JobMagic shell 8 has 0 native damage on Job01; scale balanced from player Strength
                         local str = (PB.player_strength and PB.player_strength()) or 120
-                        dmg = math.max(1, math.floor(str * 0.95 * overloadMul + 0.5))
+                        local ratio = (kind == "javelin") and 0.95 or 0.45
+                        dmg = math.max(1, math.floor(str * ratio * overloadMul + 0.5))
                         info.Damage = dmg
                         pcall(function() info.IsMagicAttack = true end)
                         pcall(function() info.MagicDamage = dmg end)
@@ -3434,7 +3441,7 @@ pcall(function()
                         dmg = baseDmg > 0 and math.max(1, math.floor(baseDmg * mul * overloadMul + 0.5)) or 0
                         info.Damage = dmg
                     end
-                    if kind == "javelin" then
+                    if kind == "javelin" or kind == "judgement" then
                         pcall(function()
                             info.DamageType = 6                     -- Hitback_M (clean flinch impact, NO stun / NO knockdown)
                             info.DamageActType = 1                  -- Flinch (NOT Down / Stun)
@@ -3474,7 +3481,7 @@ pcall(function()
                         pcall(function() info.DamageReaction = (kind == "thunderstrike" and 180) or (kind == "charged" and 220) or 140 end)
                     end
                     pcall(function() info:call("set_ElementType", 3) end)
-                    row.kind = (kind == "slash" and "Arc Slash (wave)") or (kind == "javelin" and "Lightning Javelin") or (kind == "static_counter" and "Static Counter") or (kind == "storm_carve" and "Storm Carve") or (kind == "omnislash" and "Omnislash") or (kind == "thunderstrike" and "Thunderstrike") or (kind == "levin" and "Levin Storm") or (kind == "nova" and "Nova Electrica") or ("Storm Bolt (" .. tostring(kind) .. ")")
+                    row.kind = (kind == "slash" and "Arc Slash (wave)") or (kind == "javelin" and "Lightning Javelin") or (kind == "judgement" and "Judgement of the Storm") or (kind == "static_counter" and "Static Counter") or (kind == "storm_carve" and "Storm Carve") or (kind == "omnislash" and "Omnislash") or (kind == "thunderstrike" and "Thunderstrike") or (kind == "levin" and "Levin Storm") or (kind == "nova" and "Nova Electrica") or ("Storm Bolt (" .. tostring(kind) .. ")")
                     note(("Stormblade %s hit: %.0f lightning damage (native %.0f x%.2f)"):format(row.kind, dmg, baseDmg, mul))
                 elseif kind == "bind" then
                     info.Damage = 1
@@ -6238,7 +6245,7 @@ end)()
 
     local function get_shield_custom_ids()
         if SHIELD_CUSTOM_IDS then return SHIELD_CUSTOM_IDS end
-        local map = { [3] = "Job01_ShieldSummons", [4] = "Job01_Springboard", [5] = "Job01_CymbalAttack", [9] = "Job01_ShieldCounter", [10] = "Job01_FullMoonGuard", [11] = "Job01_DivineDefense" }
+        local map = { [3] = "Job01_ShieldSummons", [4] = "Job01_Springboard", [5] = "Job01_CymbalAttack", [9] = "Job01_ShieldCounter", [10] = "Job01_FullMoonGuard", [11] = "Job01_DivineDefense", [140] = "sb_levin_removed" }
         pcall(function()
             local idTd = sdk.find_type_definition("app.HumanCustomSkillID")
             if not idTd then return end
@@ -6260,7 +6267,7 @@ end)()
             local plan = sd and sd.state and sd.state.plan
             local item = plan and plan.custom and plan.custom[id]
             local packId = item and item.entry and item.entry.pack_id
-            return packId ~= nil and packId ~= "stormblade"
+            return (id >= 100 and item == nil) or (packId ~= nil and packId ~= "stormblade")
         end)
         return ok and foreign == true
     end
