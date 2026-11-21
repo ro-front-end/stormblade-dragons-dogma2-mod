@@ -765,7 +765,7 @@ local function update_speed(a)
         end
         local sp = ONSLAUGHT[cur] and FAST or FASTER_OTHER
         if PB.activeVocation == "stormblade" and (not PB.has_augment or PB.has_augment("tempest_reflexes")) then
-            sp = sp + 0.05
+            sp = sp + 0.10
         end
         a:set_speed(sp)
         dbg.spedSeen = dbg.spedSeen or {}
@@ -5829,7 +5829,7 @@ end)()
     -- 4. Stormblade 5 Rank-Scaled Augmentations (Fulmination, Tempest Reflexes, Thew, Overload, Eye of the Hurricane)
     PB.AUGMENTS = {
         { id = "fulmination",      rank = 2, dcp = 300,  vanilla_name = "Mettle",      name = "Fulmination",          desc = "+15 Strength & +15 Magick (300 Dcp)",                        ui_desc = "Increases your Strength and Magick by +15 while wielding a sword as a Stormblade." },
-        { id = "tempest_reflexes", rank = 4, dcp = 900,  vanilla_name = "Provocation", name = "Tempest Reflexes",     desc = "+5% Sword Attack Speed (900 Dcp)",                           ui_desc = "Hones your reflexes with lightning currents, increasing your sword attack speed by +5%." },
+        { id = "tempest_reflexes", rank = 4, dcp = 900,  vanilla_name = "Provocation", name = "Tempest Reflexes",     desc = "+10% Sword Attack Speed (900 Dcp)",                          ui_desc = "Hones your reflexes with lightning currents, increasing your sword attack speed by +10%." },
         { id = "thew",             rank = 6, dcp = 1800, vanilla_name = "Thew",        name = "Thew",                 desc = "Carry Additional Weight (+10 kg) (1800 Dcp)",                 ui_desc = "Enables you to carry additional weight." },
         { id = "overload",         rank = 8, dcp = 3000, vanilla_name = "Diligence",   name = "Overload",             desc = "+12% Thunder damage vs Weak / Drenched targets (3000 Dcp)",  ui_desc = "Increases Thunder damage by +12% when striking monster weakpoints or drenched and shocked foes." },
         { id = "eye_of_hurricane", rank = 9, dcp = 5000, vanilla_name = "Dominion",    name = "Eye of the Hurricane", desc = "Knockdown Power & -10% Skill Stamina Cost (5000 Dcp)",       ui_desc = "Augments the Knockdown Power of your normal attacks and reduces the Stamina cost of all skills by 10%." },
