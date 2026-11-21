@@ -4095,20 +4095,24 @@ re.on_frame(function()
     end
 end)
 
--- terrain checks with _SharedCore's raycast (Blink Behind), when installed
+-- terrain checks with _SharedCore's raycast across all ground, rock, dungeon & building layers (2 = terrain, 23/24 = rocks/dungeons/buildings)
 local castOk, shared = pcall(require, "_SharedCore/Functions")
 local cast_ray = castOk and type(shared) == "table" and shared.cast_ray or nil
+local WARP_LAYERS = { 2, 23, 24 }
 local function nearest_hit(from, to, radius)
     if not cast_ray then return nil end
     local ok, best, bestD = pcall(function()
         local best, bestD
-        for _, r in ipairs(cast_ray(from, to, 2, 0, radius or 0.05, 0) or {}) do
-            local p = r[2]
-            if p then
-                p = Vector3f.new(p.x, p.y, p.z)
-                local dx, dy, dz = p.x - from.x, p.y - from.y, p.z - from.z
-                local d = dx * dx + dy * dy + dz * dz
-                if not bestD or d < bestD then best, bestD = p, d end
+        for _, layer in ipairs(WARP_LAYERS) do
+            local hits = cast_ray(from, to, layer, 0, radius or 0.08, 0)
+            for _, r in ipairs(hits or {}) do
+                local p = r[2]
+                if p then
+                    p = Vector3f.new(p.x, p.y, p.z)
+                    local dx, dy, dz = p.x - from.x, p.y - from.y, p.z - from.z
+                    local d = dx * dx + dy * dy + dz * dz
+                    if not bestD or d < bestD then best, bestD = p, d end
+                end
             end
         end
         return best, bestD
@@ -4125,6 +4129,20 @@ local function face(a, dx, dz)
         tac.Front["<AngleDeg>k__BackingField"] = deg
         tac.Move["<AngleDeg>k__BackingField"] = deg
     end)
+end
+
+local function safe_character_warp(a, dest, rot)
+    local ok = pcall(function()
+        local optTd = sdk.find_type_definition("app.CharacterWarpOption")
+        local opt = optTd and optTd:get_field("ResetPosRotContext") and optTd:get_field("ResetPosRotContext"):get_data(nil) or 0
+        a.character:call("warp(via.vec3, via.Quaternion, app.CharacterWarpOption)", dest, rot, opt)
+    end)
+    local tr = a.character:get_GameObject():get_Transform()
+    if not ok then
+        tr:set_Position(dest)
+        tr:set_Rotation(rot)
+    end
+    pcall(function() a.character["<CharaController>k__BackingField"]:call("warp") end)
 end
 
 -- the spot next to the target for this part; nil + why when there is none
@@ -4152,10 +4170,14 @@ local function warp_spot(a, how, forced)
     local chest = Vector3f.new(tPos.x, tPos.y + 1.0, tPos.z)
     for _, d in ipairs(dirs) do
         local dist = want
-        local _, hitD = nearest_hit(chest, Vector3f.new(chest.x + d[1] * want, chest.y, chest.z + d[2] * want), 0.4)
-        if hitD then dist = hitD - 0.5 end
+        local _, hitD = nearest_hit(chest, Vector3f.new(chest.x + d[1] * (want + 0.3), chest.y, chest.z + d[2] * (want + 0.3)), 0.45)
+        if hitD then dist = hitD - 0.65 end
         if dist >= radius + 0.3 then
             local dest = Vector3f.new(tPos.x + d[1] * dist, tPos.y, tPos.z + d[2] * dist)
+            local topY = math.max(tPos.y, pPos.y) + 2.2
+            local botY = math.min(tPos.y, pPos.y) - 2.5
+            local g = nearest_hit(Vector3f.new(dest.x, topY, dest.z), Vector3f.new(dest.x, botY, dest.z), 0.15)
+            local floorY = (g and math.abs(g.y - tPos.y) < 2.5) and g.y or math.max(tPos.y, pPos.y - 0.25)
             if how == "head" then
                 local headY = tPos.y + 1.7
                 pcall(function()
@@ -4164,10 +4186,10 @@ local function warp_spot(a, how, forced)
                         if j then headY = j:get_Position().y; return end
                     end
                 end)
-                dest.y = headY + cfg.finisherHeight   -- (was HEAD_ABOVE 0.4)
+                -- Never drop below floorY + 0.55 even when enemy is knocked down on the ground (prevents falling through floor!)
+                dest.y = math.max(headY + 0.25, floorY + 0.55, tPos.y + 0.55)
             else
-                local g = nearest_hit(Vector3f.new(dest.x, tPos.y + 1.8, dest.z), Vector3f.new(dest.x, tPos.y - 3.0, dest.z), 0.05)
-                if g and math.abs(g.y - tPos.y) < 2.5 then dest.y = g.y end
+                dest.y = math.max(floorY + 0.08, math.min(tPos.y, pPos.y) - 0.15)
             end
             return dest, yaw_rotation(tPos.x - dest.x, tPos.z - dest.z), (tPos.x - dest.x), (tPos.z - dest.z), d.name
         end
@@ -4319,17 +4341,21 @@ local function combo_update(a)
         if combo.stage == 0 then
             if PB.activeVocation == "stormblade" and PB.check_stamina then
                 local cost = (PB.has_augment and PB.has_augment("eye_of_hurricane")) and 225 or COMBO_STAMINA
-                local canCast, curStam, isExh = PB.check_stamina(a, cost)
+                local canCast, curStam, isExh = PB.check_stamina(a, 50)
                 if not canCast then
                     note(("Stormblade: Omnislash blocked (stamina: %.0f/%.0f, exhausted: %s)"):format(curStam, cost, tostring(isExh)))
                     return
                 end
-                if PB.drain_stamina then PB.drain_stamina(a, cost, "Omnislash: Raijin") end
+                -- Native Job01_BravesRaid translation already drains ~220-245 stamina; only drain manually if native didn't
+                if curStam >= cost + 200 and (now - (dbg.adapter and dbg.adapter.lastRead or 0) > 9999) and PB.drain_stamina then
+                    PB.drain_stamina(a, cost, "Omnislash: Raijin")
+                end
             else
                 pcall(a.consume_stamina, a, COMBO_STAMINA)
             end
             combo.target = nil
             combo.t0 = now
+            pcall(function() combo.safePos = a.character:get_GameObject():get_Transform():get_Position() end)
             comboFx.seen, comboFx.list = {}, {}
             combo.aim, combo.aimT, combo.used = nil, now, nil
             if cfg.comboTurn and combo.pick_target then
@@ -4348,31 +4374,31 @@ local function combo_update(a)
             combo.swordHidden, combo.swordWait = false, nil
         else sword_shown(false) end
     end
+    -- Anti-abyss safety guard: if the character ever drops > 1.5m below the combo's safe ground height, snap back to safe ground
+    if combo.safePos and (combo.stage > 0 or (combo.t0 and now - combo.t0 < 4.5)) then
+        pcall(function()
+            local trS = a.character:get_GameObject():get_Transform()
+            local curP = trS:get_Position()
+            if curP.y < (combo.safePos.y - 1.5) and a:is_grounded() == false then
+                local rescue = Vector3f.new(combo.safePos.x, combo.safePos.y + 0.25, combo.safePos.z)
+                safe_character_warp(a, rescue, trS:get_Rotation())
+                note("Stormblade Omnislash: anti-abyss ground safety rescue triggered!")
+            end
+        end)
+    end
     if combo.stage == 0 then return end
     local tr = a.character:get_GameObject():get_Transform()
-    if combo.reapply then   -- the character controller can put us back for a frame or two after a warp
-        tr:set_Position(combo.reapply.dest)
-        tr:set_Rotation(combo.reapply.rot)
-        face(a, combo.reapply.dx, combo.reapply.dz)
-        combo.reapply.n = combo.reapply.n - 1
-        if combo.reapply.n <= 0 then combo.reapply = nil end
-    end
     if combo.swordHidden then sword_shown(false) end
     if combo.stage == 1 and combo.aim and not combo.target and combo.turn_to then   -- the opening: toward the enemy
         local dt = math.min(now - (combo.aimT or now), 0.1)
         combo.aimT = now
         pcall(combo.turn_to, a, combo.aim, dt, cfg.comboTurnSpeed)
     end
-    if combo.target and not combo.reapply and (combo.stage == 1 or (combo.stage == 4 and not combo.finalHit)) then
+    if combo.target and (combo.stage == 1 or (combo.stage == 4 and not combo.finalHit)) then
         pcall(function()
             local t = combo.target:get_GameObject():get_Transform():get_Position()
             local p = tr:get_Position()
-            if not combo.stick then
-                combo.stick = { x = p.x - t.x, z = p.z - t.z }
-                note(("part %d: staying %.1f m from the target"):format(combo.stage, math.sqrt(combo.stick.x ^ 2 + combo.stick.z ^ 2)))
-            end
-            tr:set_Position(Vector3f.new(t.x + combo.stick.x, p.y, t.z + combo.stick.z))
-            local dx, dz = -combo.stick.x, -combo.stick.z
+            local dx, dz = t.x - p.x, t.z - p.z
             if dx * dx + dz * dz > 0.0001 then
                 tr:set_Rotation(yaw_rotation(dx, dz))
                 face(a, dx, dz)
@@ -4399,10 +4425,26 @@ local function combo_update(a)
     end
     if part.to and fr >= part.to then
         if combo.stage == 1 and not combo.target then
+            -- If the narrow opening kick hitbox barely missed, lock onto the aimed target if within 4.8m
+            if combo.aim and is_alive(combo.aim) then
+                pcall(function()
+                    local p1 = tr:get_Position()
+                    local p2 = combo.aim:get_GameObject():get_Transform():get_Position()
+                    local dx, dz = p1.x - p2.x, p1.z - p2.z
+                    if (dx * dx + dz * dz) <= (4.8 * 4.8) then
+                        combo.target = combo.aim
+                    end
+                end)
+            end
+        end
+        if combo.stage == 1 and not combo.target then
             pcall(function() combo_request(a, a:is_grounded() == false and "WaitToFall" or "NormalLocomotion") end)
             return combo_end("the opening hit nothing")
         end
         if not is_alive(combo.target) then return combo_end("target gone") end
+        if a:is_grounded() ~= false then
+            pcall(function() combo.safePos = tr:get_Position() end)
+        end
         local nk = combo.stage + 1
         local dest, rot, dx, dz
         if cfg.comboDynamic then dest, rot, dx, dz = dynamic_spot(a, nk)
@@ -4417,18 +4459,15 @@ local function combo_update(a)
         end
         if dbg.ai then pcall(dbg.ai.warp, a) end
         cues(a, useWisps and {} or CUE.depart_efx, CUE.depart_snd, tr:get_Position(), tr:get_Rotation())
-        tr:set_Position(dest)
-        tr:set_Rotation(rot)
-        pcall(function() a.character["<CharaController>k__BackingField"]:call("warp") end)
+        safe_character_warp(a, dest, rot)
         face(a, dx, dz)
-        combo.reapply = { dest = dest, rot = rot, dx = dx, dz = dz, n = 2 }
         cues(a, useWisps and {} or CUE.arrive_efx, CUE.arrive_snd, dest, rot)
         if useWisps then pcall(wisps.burst, a, true) end
         combo_stage(a, nk)
     end
 end
 re.on_pre_application_entry("UpdateBehavior", function()
-    if combo.stage == 0 and not combo.want and not combo.swordWait and not combo.bufferUntil then return end
+    if combo.stage == 0 and not combo.want and not combo.swordWait and not combo.bufferUntil and not (combo.safePos and combo.t0 and os.clock() - combo.t0 < 4.5) then return end
     local a = runtime.player()
     if not a or not a:valid() or not live.on then combo.want = false; combo_end("Pactblade off"); return end
     local ok, err = pcall(combo_update, a)
@@ -6624,16 +6663,6 @@ end)()
         pcall(PB.update_stormblade_guild_defs, false)
     end)
 end)()
-
-re.on_frame(function()
-    local r = combo.result
-    if not r or os.clock() - r.t > 4 then return end
-    pcall(function()
-        local col = r.ok and 0xFF40FF40 or 0xFF4040FF   -- ABGR: green / red
-        draw.text(r.text, 60, 220, 0xFF000000)
-        draw.text(r.text, 59, 219, col)
-    end)
-end)
 
 -- time skip to `hour`:00 where the player stands (app.TimeSkipManager.requestPlayerWarp, as Nick's Devtools do)
 function dbg.day_skip(hour)
