@@ -5832,7 +5832,7 @@ end)()
         { id = "tempest_reflexes", rank = 4, dcp = 900,  vanilla_name = "Provocation", name = "Tempest Reflexes",     desc = "+10% Sword Attack Speed (900 Dcp)",                          ui_desc = "Hones your reflexes with lightning currents, increasing your sword attack speed by +10%." },
         { id = "thew",             rank = 6, dcp = 1800, vanilla_name = "Thew",        name = "Thew",                 desc = "Carry Additional Weight (+10 kg) (1800 Dcp)",                 ui_desc = "Enables you to carry additional weight." },
         { id = "overload",         rank = 8, dcp = 3000, vanilla_name = "Diligence",   name = "Overload",             desc = "+12% Thunder damage vs Weak / Drenched targets (3000 Dcp)",  ui_desc = "Increases Thunder damage by +12% when striking monster weakpoints or drenched and shocked foes." },
-        { id = "eye_of_hurricane", rank = 9, dcp = 5000, vanilla_name = "Dominion",    name = "Eye of the Hurricane", desc = "Knockdown Power & -10% Skill Stamina Cost (5000 Dcp)",       ui_desc = "Augments the Knockdown Power of your normal attacks and reduces the Stamina cost of all skills by 10%." },
+        { id = "eye_of_hurricane", rank = 9, dcp = 5000, vanilla_name = "Dominion",    name = "Eye of the Hurricane", desc = "-10% Skill Stamina Cost (5000 Dcp)",                        ui_desc = "Being at the calm center of the storm reduces the Stamina cost of all Weapon Skills by 10%." },
     }
     PB.augment_ability_ids = {}
     PB.augments_unlock_all = false -- Progressive unlock by Stormblade Vocation Rank (Ranks 2, 4, 6, 8, 9)
@@ -6573,12 +6573,14 @@ end)()
             ["Wards your body with an electrostatic veil, increasing your Magick Defense by +45."] = PB.AUGMENTS[3],
             ["Hastens recovery when downed or crawling."] = PB.AUGMENTS[4],
             ["Augments the Knockdown Power of your normal attacks."] = PB.AUGMENTS[5],
+            ["Allows you to lift up and pin down foes for an extended duration."] = PB.AUGMENTS[5],
         }
         local function match_aug_desc(clean)
             if AUG_BY_DESC[clean] then return AUG_BY_DESC[clean] end
             if clean:find("targeted by foes", 1, true) then return PB.AUGMENTS[2] end
             if clean:find("physical Defense", 1, true) then return PB.AUGMENTS[1] end
             if clean:find("downed or crawling", 1, true) then return PB.AUGMENTS[4] end
+            if clean:find("lift up and pin down", 1, true) then return PB.AUGMENTS[5] end
             if clean:find("Knockdown Power of your normal attacks", 1, true) and not clean:find("10%", 1, true) then return PB.AUGMENTS[5] end
             return nil
         end
@@ -6647,6 +6649,9 @@ end)()
                     or name == "setupContents"
                     or name:find("Ability", 1, true)
                     or name:find("InfoWindow", 1, true)
+                    or name:find("Select", 1, true)
+                    or name:find("Cursor", 1, true)
+                    or name:find("Detail", 1, true)
                 ) then
                     local okG, isGen = pcall(function() return m:is_generic() end)
                     if not (okG and isGen) then
@@ -6681,10 +6686,23 @@ end)()
     re.on_pre_application_entry("UpdateBehavior", function()
         update_stormblade_skills()
     end)
+    local lastGuildRetextClock = 0
     re.on_frame(function()
         pcall(PB.update_stormblade_armor, false)
         pcall(PB.update_stormblade_augments, false)
         pcall(PB.update_stormblade_guild_defs, false)
+        if PB.lastGuildUi and PB.retext_stormblade_augments and live.on and PB.activeVocation == "stormblade" then
+            local now = os.clock()
+            if now - lastGuildRetextClock > 0.15 then
+                lastGuildRetextClock = now
+                pcall(function()
+                    local root = PB.lastGuildUi:get_field("Root") or PB.lastGuildUi.Root
+                    if root and root:call("get_Visible") then
+                        PB.retext_stormblade_augments(PB.lastGuildUi)
+                    end
+                end)
+            end
+        end
     end)
 end)()
 
