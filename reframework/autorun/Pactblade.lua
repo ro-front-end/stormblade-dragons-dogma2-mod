@@ -5872,8 +5872,9 @@ end)()
     function PB.has_augment(id)
         if not live.on or PB.activeVocation ~= "stormblade" then return false end
         if PB.augments_enabled[id] == false then return false end
+        local req = PB.augment_ranks[id]
+        if not req then return false end
         if PB.augments_unlock_all then return true end
-        local req = PB.augment_ranks[id] or 1
         if PB.stormblade_rank() < req then return false end
         local aid = PB.augment_ability_ids and PB.augment_ability_ids[id]
         if aid then
@@ -6358,6 +6359,7 @@ end)()
     local origNormalRanks = {}
     local origAbilityRanks = {}
     local AUG_ID_BY_RANK = { [2] = "fulmination", [4] = "tempest_reflexes", [6] = "thew", [8] = "overload", [9] = "eye_of_hurricane" }
+    local VANILLA_AUG_RANKS = { 2, 4, 6, 8, 9 }
     local guildDefsHidden = false
     local lastGuildStateKey = nil
 
@@ -6368,12 +6370,20 @@ end)()
             local entries = dict._entries
             local count = dict._count or 0
             if not entries or count <= 0 then return end
+            local slotIdx = 0
             for i = 0, count - 1 do
                 local e = entries[i]
                 if e then
-                    local k = tonumber(e.key)
+                    local rawK = e.key
+                    local k = tonumber(rawK)
+                    if not k and rawK ~= nil then
+                        pcall(function() k = tonumber(rawK.value__) or tonumber(rawK.m_value) end)
+                    end
                     local v = e.value
-                    if k and k >= 0 and v then fn(k, v) end
+                    if k and k >= 0 and v then
+                        slotIdx = slotIdx + 1
+                        fn(k, v, slotIdx)
+                    end
                 end
             end
         end)
@@ -6413,9 +6423,13 @@ end)()
                     p._UnlockRank = 99
                 end
             end)
-            each_dict_entry(adict, function(aid, p)
-                if origAbilityRanks[aid] == nil and p._UnlockRank and p._UnlockRank ~= 99 and p._UnlockRank ~= 1 then
-                    origAbilityRanks[aid] = p._UnlockRank
+            each_dict_entry(adict, function(aid, p, slotIdx)
+                if origAbilityRanks[aid] == nil then
+                    if p._UnlockRank and p._UnlockRank ~= 99 and p._UnlockRank ~= 1 then
+                        origAbilityRanks[aid] = p._UnlockRank
+                    else
+                        origAbilityRanks[aid] = VANILLA_AUG_RANKS[slotIdx] or 9
+                    end
                 end
                 local baseRank = origAbilityRanks[aid]
                 if baseRank then
@@ -6626,18 +6640,28 @@ end)()
         end
         PB.retext_stormblade_augments = retext_stormblade_augments
         if uiTd then
-            for _, sig in ipairs({ "getCharaId()", "setupContents(System.Int32)", "setupAbilityInfoWindow", "setupAbilityMenu" }) do
-                local m = uiTd:get_method(sig)
-                if m then
-                    sdk.hook(m, function(args)
-                        local this = sdk.to_managed_object(args[2])
-                        thread.get_hook_storage().sbUiThis = this
-                        PB.lastGuildUi = this
-                    end, function(r)
-                        local this = thread.get_hook_storage().sbUiThis
-                        if this then retext_stormblade_augments(this) end
-                        return r
-                    end)
+            for _, m in ipairs(uiTd:get_methods()) do
+                local ok, name = pcall(function() return m:get_name() end)
+                if ok and name and (
+                    name == "getCharaId"
+                    or name == "setupContents"
+                    or name:find("Ability", 1, true)
+                    or name:find("InfoWindow", 1, true)
+                ) then
+                    local okG, isGen = pcall(function() return m:is_generic() end)
+                    if not (okG and isGen) then
+                        pcall(function()
+                            sdk.hook(m, function(args)
+                                local this = sdk.to_managed_object(args[2])
+                                thread.get_hook_storage().sbUiThis = this
+                                PB.lastGuildUi = this
+                            end, function(r)
+                                local this = thread.get_hook_storage().sbUiThis
+                                if this then retext_stormblade_augments(this) end
+                                return r
+                            end)
+                        end)
+                    end
                 end
             end
         end
