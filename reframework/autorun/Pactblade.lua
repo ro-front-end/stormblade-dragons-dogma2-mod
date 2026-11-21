@@ -764,9 +764,12 @@ local function update_speed(a)
             dbg.basicName, dbg.basicMot, dbg.basicStart = cur, mot, os.clock()
         end
         local sp = ONSLAUGHT[cur] and FAST or FASTER_OTHER
+        if PB.activeVocation == "stormblade" and (not PB.has_augment or PB.has_augment("tempest_reflexes")) then
+            sp = sp + 0.05
+        end
         a:set_speed(sp)
         dbg.spedSeen = dbg.spedSeen or {}
-        if not dbg.spedSeen[cur] then dbg.spedSeen[cur] = true; note(("speed x%.1f: %s"):format(sp, cur)) end
+        if not dbg.spedSeen[cur] then dbg.spedSeen[cur] = true; note(("speed x%.2f: %s"):format(sp, cur)) end
         speeding = true
     elseif speeding then
         dbg.basicName, dbg.basicMot = nil, nil
@@ -5784,27 +5787,27 @@ end)()
         end
     end
 
-    -- 4. Stormblade 5 Rank-Scaled Augmentations (Fulmination, Conductivity, Aegis of the Storm, Overload, Eye of the Hurricane)
+    -- 4. Stormblade 5 Rank-Scaled Augmentations (Fulmination, Tempest Reflexes, Thew, Overload, Eye of the Hurricane)
     PB.AUGMENTS = {
-        { id = "fulmination",      rank = 2, dcp = 300,  vanilla_name = "Mettle",      name = "Fulmination",          desc = "+15 Strength & +15 Magick (300 Dcp)",                    ui_desc = "Increases your Strength and Magick by +15 while wielding a sword as a Stormblade." },
-        { id = "conductivity",     rank = 4, dcp = 900,  vanilla_name = "Provocation", name = "Conductivity",         desc = "+150 Max Stamina (900 Dcp)",                            ui_desc = "Bio-electrical conditioning increases your Maximum Stamina by +150." },
-        { id = "aegis",            rank = 6, dcp = 1800, vanilla_name = "Thew",        name = "Aegis of the Storm",   desc = "+45 Magick Defense (1800 Dcp)",                          ui_desc = "Wards your body with an electrostatic veil, increasing your Magick Defense by +45." },
-        { id = "overload",         rank = 8, dcp = 3000, vanilla_name = "Diligence",   name = "Overload",             desc = "+12% Thunder damage vs Weak / Drenched targets (3000 Dcp)", ui_desc = "Increases Thunder damage by +12% when striking monster weakpoints or drenched and shocked foes." },
-        { id = "eye_of_hurricane", rank = 9, dcp = 5000, vanilla_name = "Dominion",    name = "Eye of the Hurricane", desc = "-10% Stamina cost on skills (5000 Dcp)",                 ui_desc = "Calm focus at the center of the storm reduces the Stamina cost of all skills by 10%." },
+        { id = "fulmination",      rank = 2, dcp = 300,  vanilla_name = "Mettle",      name = "Fulmination",          desc = "+15 Strength & +15 Magick (300 Dcp)",                        ui_desc = "Increases your Strength and Magick by +15 while wielding a sword as a Stormblade." },
+        { id = "tempest_reflexes", rank = 4, dcp = 900,  vanilla_name = "Provocation", name = "Tempest Reflexes",     desc = "+5% Sword Attack Speed (900 Dcp)",                           ui_desc = "Hones your reflexes with lightning currents, increasing your sword attack speed by +5%." },
+        { id = "thew",             rank = 6, dcp = 1800, vanilla_name = "Thew",        name = "Thew",                 desc = "Carry Additional Weight (+10 kg) (1800 Dcp)",                 ui_desc = "Enables you to carry additional weight." },
+        { id = "overload",         rank = 8, dcp = 3000, vanilla_name = "Diligence",   name = "Overload",             desc = "+12% Thunder damage vs Weak / Drenched targets (3000 Dcp)",  ui_desc = "Increases Thunder damage by +12% when striking monster weakpoints or drenched and shocked foes." },
+        { id = "eye_of_hurricane", rank = 9, dcp = 5000, vanilla_name = "Dominion",    name = "Eye of the Hurricane", desc = "Knockdown Power & -10% Skill Stamina Cost (5000 Dcp)",       ui_desc = "Augments the Knockdown Power of your normal attacks and reduces the Stamina cost of all skills by 10%." },
     }
     PB.augment_ability_ids = {}
     PB.augments_unlock_all = false -- Progressive unlock by Stormblade Vocation Rank (Ranks 2, 4, 6, 8, 9)
     PB.augments_enabled = {
         fulmination = true,
-        conductivity = true,
-        aegis = true,
+        tempest_reflexes = true,
+        thew = true,
         overload = true,
         eye_of_hurricane = true,
     }
     PB.augment_ranks = {
         fulmination = 2,
-        conductivity = 4,
-        aegis = 6,
+        tempest_reflexes = 4,
+        thew = 6,
         overload = 8,
         eye_of_hurricane = 9,
     }
@@ -5840,13 +5843,42 @@ end)()
                 local a = runtime.player()
                 local ctx = a and a.human and a.human["<SkillContext>k__BackingField"]
                 if ctx then
+                    PB.checkingAugment = true
                     bought = (ctx:call("isAbilityEnable(app.HumanAbilityID)", aid) == true)
+                    PB.checkingAugment = false
                 end
             end)
+            PB.checkingAugment = false
             if bought ~= nil then return bought end
         end
         return true
     end
+
+    -- Neutralize Provocation's native tank aggro in combat while allowing Tempest Reflexes (same slot) to be equipped
+    pcall(function()
+        local scTd = sdk.find_type_definition("app.HumanSkillContext")
+        local isAbM = scTd and scTd:get_method("isAbilityEnable(app.HumanAbilityID)")
+        if isAbM then
+            sdk.hook(isAbM, function(args)
+                local st = thread.get_hook_storage()
+                st.sbBlockProvocation = nil
+                if not live.on or PB.activeVocation ~= "stormblade" or PB.checkingAugment or PB.inGuildUi then return end
+                local provAid = PB.augment_ability_ids and PB.augment_ability_ids["tempest_reflexes"]
+                if not provAid then return end
+                local aid = sdk.to_int64(args[3]) & 0xFFFFFFFF
+                if aid == provAid and live.ctx and sdk.to_int64(args[2]) == live.ctx then
+                    st.sbBlockProvocation = true
+                end
+            end, function(r)
+                local st = thread.get_hook_storage()
+                if st.sbBlockProvocation then
+                    st.sbBlockProvocation = nil
+                    return sdk.to_ptr(0)
+                end
+                return r
+            end)
+        end
+    end)
 
     -- Overload (Rank 8): +12% Thunder damage on weak-point or drenched/tarred targets
     function PB.overload_mul(info, isThunder)
@@ -6245,7 +6277,7 @@ end)()
 
     local function get_shield_custom_ids()
         if SHIELD_CUSTOM_IDS then return SHIELD_CUSTOM_IDS end
-        local map = { [3] = "Job01_ShieldSummons", [4] = "Job01_Springboard", [5] = "Job01_CymbalAttack", [9] = "Job01_ShieldCounter", [10] = "Job01_FullMoonGuard", [11] = "Job01_DivineDefense", [140] = "sb_levin_removed" }
+        local map = { [3] = "Job01_ShieldSummons", [4] = "Job01_Springboard", [5] = "Job01_CymbalAttack", [9] = "Job01_ShieldCounter", [10] = "Job01_FullMoonGuard", [11] = "Job01_DivineDefense" }
         pcall(function()
             local idTd = sdk.find_type_definition("app.HumanCustomSkillID")
             if not idTd then return end
@@ -6286,118 +6318,98 @@ end)()
     local origCustomRanks = {}
     local origNormalRanks = {}
     local origAbilityRanks = {}
-    local AUG_ID_BY_RANK = { [2] = "fulmination", [4] = "conductivity", [6] = "aegis", [8] = "overload", [9] = "eye_of_hurricane" }
+    local AUG_ID_BY_RANK = { [2] = "fulmination", [4] = "tempest_reflexes", [6] = "thew", [8] = "overload", [9] = "eye_of_hurricane" }
     local guildDefsHidden = false
+    local lastGuildStateKey = nil
+
+    -- Safe C# Dictionary iteration via _entries (NEVER calls get_Item, so zero KeyNotFoundExceptions in REFramework!)
+    local function each_dict_entry(dict, fn)
+        if not dict then return end
+        pcall(function()
+            local entries = dict._entries
+            local count = dict._count or 0
+            if not entries or count <= 0 then return end
+            for i = 0, count - 1 do
+                local e = entries[i]
+                if e then
+                    local k = tonumber(e.key)
+                    local v = e.value
+                    if k and k >= 0 and v then fn(k, v) end
+                end
+            end
+        end)
+    end
 
     function PB.update_stormblade_guild_defs(forceRestore)
         local wantHide = (not forceRestore) and (not dbg.guardHold) and live.on and (PB.activeVocation == "stormblade")
         if not wantHide and not guildDefsHidden then return end
+        local sbRank = wantHide and PB.stormblade_rank() or 0
+        local stateKey = tostring(wantHide) .. "|" .. tostring(sbRank) .. "|" .. tostring(PB.augments_unlock_all)
+        if not forceRestore and stateKey == lastGuildStateKey then return end
         local gm = sdk.get_managed_singleton("app.GuiManager")
         if not gm or not gm.CustomSkillDefineDictionary or not gm.NormalSkillDefineDictionary then return end
         local cdict = gm.CustomSkillDefineDictionary
         local jdict = gm.CustomSkillJobDefineDictionary and gm.CustomSkillJobDefineDictionary[1]
-        local ndict = gm.NormalSkillDefineDictionary["Job01"]
+        local ndict = gm.NormalSkillDefineDictionary and gm.NormalSkillDefineDictionary["Job01"]
         local adict = gm.AbilityDefineDictionary and gm.AbilityDefineDictionary["Job01"]
         local shieldIds = get_shield_custom_ids()
 
         if wantHide then
-            for sid in pairs(shieldIds) do
-                for _, d in ipairs({ cdict, jdict }) do
-                    if d then
-                        pcall(function()
-                            local levels = d[sid]
-                            if not levels then return end
-                            origCustomRanks[sid] = origCustomRanks[sid] or {}
-                            for lv = 1, 3 do
-                                pcall(function()
-                                    local p = levels[lv]
-                                    if p and p._UnlockRank ~= 99 then
-                                        if origCustomRanks[sid][lv] == nil then origCustomRanks[sid][lv] = p._UnlockRank end
-                                        p._UnlockRank = 99
-                                    end
-                                end)
+            for _, d in ipairs({ cdict, jdict }) do
+                each_dict_entry(d, function(sid, levels)
+                    if shieldIds[sid] then
+                        origCustomRanks[sid] = origCustomRanks[sid] or {}
+                        each_dict_entry(levels, function(lv, p)
+                            if p._UnlockRank and p._UnlockRank ~= 99 then
+                                if origCustomRanks[sid][lv] == nil then origCustomRanks[sid][lv] = p._UnlockRank end
+                                p._UnlockRank = 99
                             end
                         end)
                     end
-                end
-            end
-            if ndict then
-                for nid in pairs(SHIELD_NORMAL_IDS) do
-                    pcall(function()
-                        local p = ndict[nid]
-                        if p and p._UnlockRank ~= 99 then
-                            if origNormalRanks[nid] == nil then origNormalRanks[nid] = p._UnlockRank end
-                            p._UnlockRank = 99
-                        end
-                    end)
-                end
-            end
-            if adict then
-                local sbRank = PB.stormblade_rank()
-                pcall(function()
-                    local entries = adict._entries
-                    for i = 0, (adict._count or 0) - 1 do
-                        local e = entries[i]
-                        local aid = e and tonumber(e.key)
-                        local p = e and e.value
-                        if aid and p then
-                            if origAbilityRanks[aid] == nil and p._UnlockRank ~= 99 and p._UnlockRank ~= 1 then
-                                origAbilityRanks[aid] = p._UnlockRank
-                            end
-                            local baseRank = origAbilityRanks[aid]
-                            if baseRank then
-                                local augId = AUG_ID_BY_RANK[baseRank]
-                                if augId then PB.augment_ability_ids[augId] = aid end
-                                if PB.augments_unlock_all or sbRank >= baseRank then
-                                    p._UnlockRank = 1
-                                else
-                                    p._UnlockRank = 99
-                                end
-                            end
-                        end
-                    end
                 end)
             end
+            each_dict_entry(ndict, function(nid, p)
+                if SHIELD_NORMAL_IDS[nid] and p._UnlockRank and p._UnlockRank ~= 99 then
+                    if origNormalRanks[nid] == nil then origNormalRanks[nid] = p._UnlockRank end
+                    p._UnlockRank = 99
+                end
+            end)
+            each_dict_entry(adict, function(aid, p)
+                if origAbilityRanks[aid] == nil and p._UnlockRank and p._UnlockRank ~= 99 and p._UnlockRank ~= 1 then
+                    origAbilityRanks[aid] = p._UnlockRank
+                end
+                local baseRank = origAbilityRanks[aid]
+                if baseRank then
+                    local augId = AUG_ID_BY_RANK[baseRank]
+                    if augId then PB.augment_ability_ids[augId] = aid end
+                    if PB.augments_unlock_all or sbRank >= baseRank then
+                        p._UnlockRank = 1
+                    else
+                        p._UnlockRank = 99
+                    end
+                end
+            end)
             guildDefsHidden = true
+            lastGuildStateKey = stateKey
         else
-            for sid, lvs in pairs(origCustomRanks) do
-                for _, d in ipairs({ cdict, jdict }) do
-                    if d then
-                        pcall(function()
-                            local levels = d[sid]
-                            if not levels then return end
-                            for lv, rnk in pairs(lvs) do
-                                pcall(function()
-                                    local p = levels[lv]
-                                    if p then p._UnlockRank = rnk end
-                                end)
-                            end
+            for _, d in ipairs({ cdict, jdict }) do
+                each_dict_entry(d, function(sid, levels)
+                    local lvs = origCustomRanks[sid]
+                    if lvs then
+                        each_dict_entry(levels, function(lv, p)
+                            if lvs[lv] ~= nil then p._UnlockRank = lvs[lv] end
                         end)
-                    end
-                end
-            end
-            if ndict then
-                for nid, rnk in pairs(origNormalRanks) do
-                    pcall(function()
-                        local p = ndict[nid]
-                        if p then p._UnlockRank = rnk end
-                    end)
-                end
-            end
-            if adict then
-                pcall(function()
-                    local entries = adict._entries
-                    for i = 0, (adict._count or 0) - 1 do
-                        local e = entries[i]
-                        local aid = e and tonumber(e.key)
-                        local p = e and e.value
-                        if aid and p and origAbilityRanks[aid] then
-                            p._UnlockRank = origAbilityRanks[aid]
-                        end
                     end
                 end)
             end
+            each_dict_entry(ndict, function(nid, p)
+                if origNormalRanks[nid] ~= nil then p._UnlockRank = origNormalRanks[nid] end
+            end)
+            each_dict_entry(adict, function(aid, p)
+                if origAbilityRanks[aid] ~= nil then p._UnlockRank = origAbilityRanks[aid] end
+            end)
             guildDefsHidden = false
+            lastGuildStateKey = stateKey
         end
     end
 
@@ -6482,26 +6494,44 @@ end)()
                     local list = found[LIST_TYPE]
                     if list then filter_main_contents_list(list) end
                 end)
-            end, function(r) return r end)
+            end, function(r)
+                if PB.lastGuildUi and PB.retext_stormblade_augments then
+                    pcall(PB.retext_stormblade_augments, PB.lastGuildUi)
+                end
+                return r
+            end)
         end
 
         -- Rename the 5 Fighter Augments in the Vocation Guild (Mettle, Provocation, Thew, Diligence, Dominion) to Stormblade's 5 Augmentations
         local AUG_BY_NAME = {
-            ["Mettle"]      = PB.AUGMENTS[1],
-            ["Provocation"] = PB.AUGMENTS[2],
-            ["Thew"]        = PB.AUGMENTS[3],
-            ["Diligence"]   = PB.AUGMENTS[4],
-            ["Dominion"]    = PB.AUGMENTS[5],
+            ["Mettle"]             = PB.AUGMENTS[1],
+            ["Provocation"]        = PB.AUGMENTS[2],
+            ["Conductivity"]       = PB.AUGMENTS[2],
+            ["Thew"]               = PB.AUGMENTS[3],
+            ["Aegis of the Storm"] = PB.AUGMENTS[3],
+            ["Diligence"]          = PB.AUGMENTS[4],
+            ["Dominion"]           = PB.AUGMENTS[5],
         }
         local AUG_BY_DESC = {
             ["Augments your physical Defense."] = PB.AUGMENTS[1],
             ["Increases the likelihood of your being targeted by foes."] = PB.AUGMENTS[2],
+            ["Bio-electrical conditioning increases your Maximum Stamina by +150."] = PB.AUGMENTS[2],
             ["Enables you to carry additional weight."] = PB.AUGMENTS[3],
+            ["Wards your body with an electrostatic veil, increasing your Magick Defense by +45."] = PB.AUGMENTS[3],
             ["Hastens recovery when downed or crawling."] = PB.AUGMENTS[4],
             ["Augments the Knockdown Power of your normal attacks."] = PB.AUGMENTS[5],
         }
+        local function match_aug_desc(clean)
+            if AUG_BY_DESC[clean] then return AUG_BY_DESC[clean] end
+            if clean:find("targeted by foes", 1, true) then return PB.AUGMENTS[2] end
+            if clean:find("physical Defense", 1, true) then return PB.AUGMENTS[1] end
+            if clean:find("downed or crawling", 1, true) then return PB.AUGMENTS[4] end
+            if clean:find("Knockdown Power of your normal attacks", 1, true) and not clean:find("10%", 1, true) then return PB.AUGMENTS[5] end
+            return nil
+        end
         local function retext_stormblade_augments(this)
             if not this or not live.on or PB.activeVocation ~= "stormblade" then return end
+            PB.inGuildUi = true
             pcall(function()
                 local sl = this._Main_ContentsListCtrl
                 if sl and sl.InfoList and sl.ItemList then
@@ -6526,17 +6556,17 @@ end)()
                 local root = this:get_field("Root") or this.Root
                 if not root then return end
                 local function walk(c, depth)
-                    if not c or depth > 14 then return end
+                    if not c or depth > 24 then return end
                     pcall(function()
                         if c:get_type_definition():is_a("via.gui.Text") then
                             local msg = c:call("get_Message")
                             if msg then
-                                local clean = tostring(msg):gsub("<[^>]*>", "")
-                                local byN = AUG_BY_NAME[clean]
+                                local clean = tostring(msg):gsub("<[^>]*>", ""):gsub("%s+", " "):match("^%s*(.-)%s*$")
+                                local byN = clean and AUG_BY_NAME[clean]
                                 if byN then
                                     c:call("set_Message", byN.name)
-                                else
-                                    local byD = AUG_BY_DESC[clean]
+                                elseif clean then
+                                    local byD = match_aug_desc(clean)
                                     if byD then c:call("set_Message", byD.ui_desc) end
                                 end
                             end
@@ -6553,13 +6583,17 @@ end)()
                 end
                 walk(root, 0)
             end)
+            PB.inGuildUi = false
         end
+        PB.retext_stormblade_augments = retext_stormblade_augments
         if uiTd then
             for _, sig in ipairs({ "getCharaId()", "setupContents(System.Int32)", "setupAbilityInfoWindow", "setupAbilityMenu" }) do
                 local m = uiTd:get_method(sig)
                 if m then
                     sdk.hook(m, function(args)
-                        thread.get_hook_storage().sbUiThis = sdk.to_managed_object(args[2])
+                        local this = sdk.to_managed_object(args[2])
+                        thread.get_hook_storage().sbUiThis = this
+                        PB.lastGuildUi = this
                     end, function(r)
                         local this = thread.get_hook_storage().sbUiThis
                         if this then retext_stormblade_augments(this) end
