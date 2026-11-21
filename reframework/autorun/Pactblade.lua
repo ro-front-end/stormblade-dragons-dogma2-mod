@@ -765,7 +765,7 @@ local function update_speed(a)
         end
         local sp = ONSLAUGHT[cur] and FAST or FASTER_OTHER
         if PB.activeVocation == "stormblade" and (not PB.has_augment or PB.has_augment("tempest_reflexes")) then
-            sp = sp + 0.10
+            sp = sp + 0.30
         end
         a:set_speed(sp)
         dbg.spedSeen = dbg.spedSeen or {}
@@ -3415,16 +3415,16 @@ pcall(function()
                 row.enchant = info.EnchantDamage
                 row.elemental = info.NonMagicElementDamage
                 if PB.activeVocation == "stormblade" and (kind == "charged" or kind == "tap" or kind == "burst" or kind == "bind" or kind == "levin" or kind == "nova" or kind == "thunderstrike" or kind == "javelin" or kind == "judgement" or kind == "slash" or kind == "static_counter" or kind == "storm_carve" or kind == "omnislash") then
-                    local mul = (kind == "slash" and 1.80)
-                             or (kind == "static_counter" and 0.80)
-                             or (kind == "storm_carve" and 0.65)
-                             or (kind == "omnislash" and 0.75)
-                             or (kind == "thunderstrike" and 0.80)
-                             or (kind == "levin" and 1.15)
-                             or (kind == "nova" and 1.10)
-                             or (kind == "charged" and 1.00)
-                             or (kind == "burst" and 0.85)
-                             or 0.85
+                    local mul = (kind == "slash" and 1.35)
+                             or (kind == "static_counter" and 0.65)
+                             or (kind == "storm_carve" and 0.50)
+                             or (kind == "omnislash" and 0.60)
+                             or (kind == "thunderstrike" and 0.65)
+                             or (kind == "levin" and 0.90)
+                             or (kind == "nova" and 0.85)
+                             or (kind == "charged" and 0.80)
+                             or (kind == "burst" and 0.70)
+                             or 0.70
                     local overloadMul = (PB.overload_mul and PB.overload_mul(info, true)) or 1.0
                     local baseDmg = tonumber(before) or 0
                     local dmg = 0
@@ -3432,7 +3432,7 @@ pcall(function()
                     if kind == "javelin" or kind == "judgement" then
                         -- Javelin & Judgement: JobMagic shell 8 has 0 native damage on Job01; scale balanced from player Strength
                         local str = (PB.player_strength and PB.player_strength()) or 120
-                        local ratio = (kind == "javelin") and 0.95 or 0.45
+                        local ratio = (kind == "javelin") and 0.72 or 0.34
                         dmg = math.max(1, math.floor(str * ratio * overloadMul + 0.5))
                         info.Damage = dmg
                         pcall(function() info.IsMagicAttack = true end)
@@ -3504,18 +3504,24 @@ pcall(function()
                     if PB.activeVocation == "stormblade" then
                         local overloadMul = (PB.overload_mul and PB.overload_mul(info, true)) or 1.0
                         local baseSword = tonumber(before) or 0
-                        info.Damage = baseSword > 0 and math.max(1, math.floor(baseSword * 1.0 * overloadMul + 0.5)) or 0
+                        info.Damage = baseSword > 0 and math.max(1, math.floor(baseSword * 0.78 * overloadMul + 0.5)) or 0
                         row.kind = "Arc Slash (sword)"
                     else
                         info.Damage = info.Damage * (combo.slash.swordMul or 2)
                         row.kind = "Eldritch Slash (sword)"
                     end
-                elseif not kind and live.on and PB.activeVocation == "stormblade" and PB.overload_mul then
-                    local isThunder = (tonumber(el) == 3)
-                    if not isThunder then pcall(function() isThunder = (tonumber(info:call("get_ElementType")) == 3) end) end
-                    if isThunder then
-                        local om = PB.overload_mul(info, true)
-                        if om > 1.0 then info.Damage = math.floor(info.Damage * om) end
+                elseif not kind and live.on and PB.activeVocation == "stormblade" then
+                    local om = 1.0
+                    if PB.overload_mul then
+                        local isThunder = (tonumber(el) == 3)
+                        if not isThunder then pcall(function() isThunder = (tonumber(info:call("get_ElementType")) == 3) end) end
+                        if isThunder then
+                            om = PB.overload_mul(info, true) or 1.0
+                        end
+                    end
+                    local baseSword = tonumber(info.Damage) or 0
+                    if baseSword > 0 then
+                        info.Damage = math.max(1, math.floor(baseSword * 0.78 * om + 0.5))
                     end
                 end
                 if kind == "charged" and live.on then   -- (3.34: the beam's damage base: the game's raw magick value)
@@ -5829,7 +5835,7 @@ end)()
     -- 4. Stormblade 5 Rank-Scaled Augmentations (Fulmination, Tempest Reflexes, Thew, Overload, Eye of the Hurricane)
     PB.AUGMENTS = {
         { id = "fulmination",      rank = 2, dcp = 300,  vanilla_name = "Mettle",      name = "Fulmination",          desc = "+15 Strength & +15 Magick (300 Dcp)",                        ui_desc = "Increases your Strength and Magick by +15 while wielding a sword as a Stormblade." },
-        { id = "tempest_reflexes", rank = 4, dcp = 900,  vanilla_name = "Provocation", name = "Tempest Reflexes",     desc = "+10% Sword Attack Speed (900 Dcp)",                          ui_desc = "Hones your reflexes with lightning currents, increasing your sword attack speed by +10%." },
+        { id = "tempest_reflexes", rank = 4, dcp = 900,  vanilla_name = "Provocation", name = "Tempest Reflexes",     desc = "+30% Sword Attack Speed (1.60x) (900 Dcp)",                  ui_desc = "Hones your reflexes with lightning currents, increasing your sword attack speed to 1.60x." },
         { id = "thew",             rank = 6, dcp = 1800, vanilla_name = "Thew",        name = "Thew",                 desc = "Carry Additional Weight (+10 kg) (1800 Dcp)",                 ui_desc = "Enables you to carry additional weight." },
         { id = "overload",         rank = 8, dcp = 3000, vanilla_name = "Diligence",   name = "Overload",             desc = "+12% Thunder damage vs Weak / Drenched targets (3000 Dcp)",  ui_desc = "Increases Thunder damage by +12% when striking monster weakpoints or drenched and shocked foes." },
         { id = "eye_of_hurricane", rank = 9, dcp = 5000, vanilla_name = "Dominion",    name = "Eye of the Hurricane", desc = "-10% Skill Stamina Cost (5000 Dcp)",                        ui_desc = "Being at the calm center of the storm reduces the Stamina cost of all Weapon Skills by 10%." },
