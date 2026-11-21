@@ -474,6 +474,7 @@ function dbg.press_ok() return not dbg.INTEGRATED or (dbg.pbDepth or 0) > 0 end
             if vid and fid then m[math.tointeger(vid) or vid] = { kind = kind, fid = fid }; n = n + 1 end
         end
         A.map, A.found = m, n
+        A.judgementId = ids["7a31b412-4019-4b21-99ee-b01149e1a008"] and (math.tointeger(ids["7a31b412-4019-4b21-99ee-b01149e1a008"]) or ids["7a31b412-4019-4b21-99ee-b01149e1a008"]) or 142
         A.info = ("%d / 8 Pactblade skills known to VSB"):format(n)
     end
     local function translate(args, idx)
@@ -484,6 +485,9 @@ function dbg.press_ok() return not dbg.INTEGRATED or (dbg.pbDepth or 0) > 0 end
         if not live.on then return end
         pcall(A.refresh)
         local id = id0
+        if PB.activeVocation == "stormblade" and id == (A.judgementId or 142) then
+            PB.judgementT = os.clock()
+        end
         local e = A.map[id]
         if not e then return end
         note(("adapter: %s (VSB %d) -> Fighter id %d"):format(e.kind, id, e.fid))
@@ -760,9 +764,12 @@ local function update_speed(a)
             dbg.basicName, dbg.basicMot, dbg.basicStart = cur, mot, os.clock()
         end
         local sp = ONSLAUGHT[cur] and FAST or FASTER_OTHER
+        if PB.activeVocation == "stormblade" and (not PB.has_augment or PB.has_augment("tempest_reflexes")) then
+            sp = sp + 0.10
+        end
         a:set_speed(sp)
         dbg.spedSeen = dbg.spedSeen or {}
-        if not dbg.spedSeen[cur] then dbg.spedSeen[cur] = true; note(("speed x%.1f: %s"):format(sp, cur)) end
+        if not dbg.spedSeen[cur] then dbg.spedSeen[cur] = true; note(("speed x%.2f: %s"):format(sp, cur)) end
         speeding = true
     elseif speeding then
         dbg.basicName, dbg.basicMot = nil, nil
@@ -1831,7 +1838,8 @@ pcall(function()
         function(args)
             if not live.on or ourSpawn then return end
             local beamAir = dbg.beam and dbg.beam.stage == "air"
-            if not beamAir and os.clock() - lastFire > 1.5 then return end
+            local javSuppress = PB.activeVocation == "stormblade" and (PB.javelin_active or (PB.lastJavelinCastAt and os.clock() - PB.lastJavelinCastAt < 1.2))
+            if not beamAir and not javSuppress and os.clock() - lastFire > 1.5 then return end
             local owner = sdk.to_managed_object(args[3])
             if owner and owner:get_address() == live.go and beamAir then
                 dbg.suppressed = dbg.suppressed + 1
@@ -3345,6 +3353,7 @@ pcall(function()
                         elseif PB.omnislashT and os.clock() - PB.omnislashT < 2.0 then s.pbKind = "omnislash"
                         elseif PB.thunderstrikeT and os.clock() - PB.thunderstrikeT < 1.2 then s.pbKind = "thunderstrike"
                         elseif PB.javelinT and os.clock() - PB.javelinT < 1.8 then s.pbKind = "javelin"
+                        elseif PB.judgementT and os.clock() - PB.judgementT < 2.8 then s.pbKind = "judgement"
                         elseif PB.levinT and os.clock() - PB.levinT < 2.5 then s.pbKind = "levin"
                         elseif PB.novaT and os.clock() - PB.novaT < 2.0 then s.pbKind = "nova" end
                     end
@@ -3405,7 +3414,7 @@ pcall(function()
                 end)
                 row.enchant = info.EnchantDamage
                 row.elemental = info.NonMagicElementDamage
-                if PB.activeVocation == "stormblade" and (kind == "charged" or kind == "tap" or kind == "burst" or kind == "bind" or kind == "levin" or kind == "nova" or kind == "thunderstrike" or kind == "javelin" or kind == "slash" or kind == "static_counter" or kind == "storm_carve" or kind == "omnislash") then
+                if PB.activeVocation == "stormblade" and (kind == "charged" or kind == "tap" or kind == "burst" or kind == "bind" or kind == "levin" or kind == "nova" or kind == "thunderstrike" or kind == "javelin" or kind == "judgement" or kind == "slash" or kind == "static_counter" or kind == "storm_carve" or kind == "omnislash") then
                     local mul = (kind == "slash" and 1.80)
                              or (kind == "static_counter" and 0.80)
                              or (kind == "storm_carve" and 0.65)
@@ -3420,10 +3429,11 @@ pcall(function()
                     local baseDmg = tonumber(before) or 0
                     local dmg = 0
 
-                    if kind == "javelin" then
-                        -- Javelin: JobMagic shell 8 has 0 native damage; scale balanced from player Strength
+                    if kind == "javelin" or kind == "judgement" then
+                        -- Javelin & Judgement: JobMagic shell 8 has 0 native damage on Job01; scale balanced from player Strength
                         local str = (PB.player_strength and PB.player_strength()) or 120
-                        dmg = math.max(1, math.floor(str * 0.95 * overloadMul + 0.5))
+                        local ratio = (kind == "javelin") and 0.95 or 0.45
+                        dmg = math.max(1, math.floor(str * ratio * overloadMul + 0.5))
                         info.Damage = dmg
                         pcall(function() info.IsMagicAttack = true end)
                         pcall(function() info.MagicDamage = dmg end)
@@ -3434,7 +3444,7 @@ pcall(function()
                         dmg = baseDmg > 0 and math.max(1, math.floor(baseDmg * mul * overloadMul + 0.5)) or 0
                         info.Damage = dmg
                     end
-                    if kind == "javelin" then
+                    if kind == "javelin" or kind == "judgement" then
                         pcall(function()
                             info.DamageType = 6                     -- Hitback_M (clean flinch impact, NO stun / NO knockdown)
                             info.DamageActType = 1                  -- Flinch (NOT Down / Stun)
@@ -3474,7 +3484,7 @@ pcall(function()
                         pcall(function() info.DamageReaction = (kind == "thunderstrike" and 180) or (kind == "charged" and 220) or 140 end)
                     end
                     pcall(function() info:call("set_ElementType", 3) end)
-                    row.kind = (kind == "slash" and "Arc Slash (wave)") or (kind == "javelin" and "Lightning Javelin") or (kind == "static_counter" and "Static Counter") or (kind == "storm_carve" and "Storm Carve") or (kind == "omnislash" and "Omnislash") or (kind == "thunderstrike" and "Thunderstrike") or (kind == "levin" and "Levin Storm") or (kind == "nova" and "Nova Electrica") or ("Storm Bolt (" .. tostring(kind) .. ")")
+                    row.kind = (kind == "slash" and "Arc Slash (wave)") or (kind == "javelin" and "Lightning Javelin") or (kind == "judgement" and "Judgement of the Storm") or (kind == "static_counter" and "Static Counter") or (kind == "storm_carve" and "Storm Carve") or (kind == "omnislash" and "Omnislash") or (kind == "thunderstrike" and "Thunderstrike") or (kind == "levin" and "Levin Storm") or (kind == "nova" and "Nova Electrica") or ("Storm Bolt (" .. tostring(kind) .. ")")
                     note(("Stormblade %s hit: %.0f lightning damage (native %.0f x%.2f)"):format(row.kind, dmg, baseDmg, mul))
                 elseif kind == "bind" then
                     info.Damage = 1
@@ -4085,20 +4095,24 @@ re.on_frame(function()
     end
 end)
 
--- terrain checks with _SharedCore's raycast (Blink Behind), when installed
+-- terrain checks with _SharedCore's raycast across all ground, rock, dungeon & building layers (2 = terrain, 23/24 = rocks/dungeons/buildings)
 local castOk, shared = pcall(require, "_SharedCore/Functions")
 local cast_ray = castOk and type(shared) == "table" and shared.cast_ray or nil
+local WARP_LAYERS = { 2, 23, 24 }
 local function nearest_hit(from, to, radius)
     if not cast_ray then return nil end
     local ok, best, bestD = pcall(function()
         local best, bestD
-        for _, r in ipairs(cast_ray(from, to, 2, 0, radius or 0.05, 0) or {}) do
-            local p = r[2]
-            if p then
-                p = Vector3f.new(p.x, p.y, p.z)
-                local dx, dy, dz = p.x - from.x, p.y - from.y, p.z - from.z
-                local d = dx * dx + dy * dy + dz * dz
-                if not bestD or d < bestD then best, bestD = p, d end
+        for _, layer in ipairs(WARP_LAYERS) do
+            local hits = cast_ray(from, to, layer, 0, radius or 0.08, 0)
+            for _, r in ipairs(hits or {}) do
+                local p = r[2]
+                if p then
+                    p = Vector3f.new(p.x, p.y, p.z)
+                    local dx, dy, dz = p.x - from.x, p.y - from.y, p.z - from.z
+                    local d = dx * dx + dy * dy + dz * dz
+                    if not bestD or d < bestD then best, bestD = p, d end
+                end
             end
         end
         return best, bestD
@@ -4115,6 +4129,20 @@ local function face(a, dx, dz)
         tac.Front["<AngleDeg>k__BackingField"] = deg
         tac.Move["<AngleDeg>k__BackingField"] = deg
     end)
+end
+
+local function safe_character_warp(a, dest, rot)
+    local ok = pcall(function()
+        local optTd = sdk.find_type_definition("app.CharacterWarpOption")
+        local opt = optTd and optTd:get_field("ResetPosRotContext") and optTd:get_field("ResetPosRotContext"):get_data(nil) or 0
+        a.character:call("warp(via.vec3, via.Quaternion, app.CharacterWarpOption)", dest, rot, opt)
+    end)
+    local tr = a.character:get_GameObject():get_Transform()
+    if not ok then
+        tr:set_Position(dest)
+        tr:set_Rotation(rot)
+    end
+    pcall(function() a.character["<CharaController>k__BackingField"]:call("warp") end)
 end
 
 -- the spot next to the target for this part; nil + why when there is none
@@ -4142,10 +4170,14 @@ local function warp_spot(a, how, forced)
     local chest = Vector3f.new(tPos.x, tPos.y + 1.0, tPos.z)
     for _, d in ipairs(dirs) do
         local dist = want
-        local _, hitD = nearest_hit(chest, Vector3f.new(chest.x + d[1] * want, chest.y, chest.z + d[2] * want), 0.4)
-        if hitD then dist = hitD - 0.5 end
+        local _, hitD = nearest_hit(chest, Vector3f.new(chest.x + d[1] * (want + 0.3), chest.y, chest.z + d[2] * (want + 0.3)), 0.45)
+        if hitD then dist = hitD - 0.65 end
         if dist >= radius + 0.3 then
             local dest = Vector3f.new(tPos.x + d[1] * dist, tPos.y, tPos.z + d[2] * dist)
+            local topY = math.max(tPos.y, pPos.y) + 2.2
+            local botY = math.min(tPos.y, pPos.y) - 2.5
+            local g = nearest_hit(Vector3f.new(dest.x, topY, dest.z), Vector3f.new(dest.x, botY, dest.z), 0.15)
+            local floorY = (g and math.abs(g.y - tPos.y) < 2.5) and g.y or math.max(tPos.y, pPos.y - 0.25)
             if how == "head" then
                 local headY = tPos.y + 1.7
                 pcall(function()
@@ -4154,10 +4186,10 @@ local function warp_spot(a, how, forced)
                         if j then headY = j:get_Position().y; return end
                     end
                 end)
-                dest.y = headY + cfg.finisherHeight   -- (was HEAD_ABOVE 0.4)
+                -- Never drop below floorY + 0.55 even when enemy is knocked down on the ground (prevents falling through floor!)
+                dest.y = math.max(headY + 0.25, floorY + 0.55, tPos.y + 0.55)
             else
-                local g = nearest_hit(Vector3f.new(dest.x, tPos.y + 1.8, dest.z), Vector3f.new(dest.x, tPos.y - 3.0, dest.z), 0.05)
-                if g and math.abs(g.y - tPos.y) < 2.5 then dest.y = g.y end
+                dest.y = math.max(floorY + 0.08, math.min(tPos.y, pPos.y) - 0.15)
             end
             return dest, yaw_rotation(tPos.x - dest.x, tPos.z - dest.z), (tPos.x - dest.x), (tPos.z - dest.z), d.name
         end
@@ -4309,17 +4341,21 @@ local function combo_update(a)
         if combo.stage == 0 then
             if PB.activeVocation == "stormblade" and PB.check_stamina then
                 local cost = (PB.has_augment and PB.has_augment("eye_of_hurricane")) and 225 or COMBO_STAMINA
-                local canCast, curStam, isExh = PB.check_stamina(a, cost)
+                local canCast, curStam, isExh = PB.check_stamina(a, 50)
                 if not canCast then
                     note(("Stormblade: Omnislash blocked (stamina: %.0f/%.0f, exhausted: %s)"):format(curStam, cost, tostring(isExh)))
                     return
                 end
-                if PB.drain_stamina then PB.drain_stamina(a, cost, "Omnislash: Raijin") end
+                -- Native Job01_BravesRaid translation already drains ~220-245 stamina; only drain manually if native didn't
+                if curStam >= cost + 200 and (now - (dbg.adapter and dbg.adapter.lastRead or 0) > 9999) and PB.drain_stamina then
+                    PB.drain_stamina(a, cost, "Omnislash: Raijin")
+                end
             else
                 pcall(a.consume_stamina, a, COMBO_STAMINA)
             end
             combo.target = nil
             combo.t0 = now
+            pcall(function() combo.safePos = a.character:get_GameObject():get_Transform():get_Position() end)
             comboFx.seen, comboFx.list = {}, {}
             combo.aim, combo.aimT, combo.used = nil, now, nil
             if cfg.comboTurn and combo.pick_target then
@@ -4338,31 +4374,31 @@ local function combo_update(a)
             combo.swordHidden, combo.swordWait = false, nil
         else sword_shown(false) end
     end
+    -- Anti-abyss safety guard: if the character ever drops > 1.5m below the combo's safe ground height, snap back to safe ground
+    if combo.safePos and (combo.stage > 0 or (combo.t0 and now - combo.t0 < 4.5)) then
+        pcall(function()
+            local trS = a.character:get_GameObject():get_Transform()
+            local curP = trS:get_Position()
+            if curP.y < (combo.safePos.y - 1.5) and a:is_grounded() == false then
+                local rescue = Vector3f.new(combo.safePos.x, combo.safePos.y + 0.25, combo.safePos.z)
+                safe_character_warp(a, rescue, trS:get_Rotation())
+                note("Stormblade Omnislash: anti-abyss ground safety rescue triggered!")
+            end
+        end)
+    end
     if combo.stage == 0 then return end
     local tr = a.character:get_GameObject():get_Transform()
-    if combo.reapply then   -- the character controller can put us back for a frame or two after a warp
-        tr:set_Position(combo.reapply.dest)
-        tr:set_Rotation(combo.reapply.rot)
-        face(a, combo.reapply.dx, combo.reapply.dz)
-        combo.reapply.n = combo.reapply.n - 1
-        if combo.reapply.n <= 0 then combo.reapply = nil end
-    end
     if combo.swordHidden then sword_shown(false) end
     if combo.stage == 1 and combo.aim and not combo.target and combo.turn_to then   -- the opening: toward the enemy
         local dt = math.min(now - (combo.aimT or now), 0.1)
         combo.aimT = now
         pcall(combo.turn_to, a, combo.aim, dt, cfg.comboTurnSpeed)
     end
-    if combo.target and not combo.reapply and (combo.stage == 1 or (combo.stage == 4 and not combo.finalHit)) then
+    if combo.target and (combo.stage == 1 or (combo.stage == 4 and not combo.finalHit)) then
         pcall(function()
             local t = combo.target:get_GameObject():get_Transform():get_Position()
             local p = tr:get_Position()
-            if not combo.stick then
-                combo.stick = { x = p.x - t.x, z = p.z - t.z }
-                note(("part %d: staying %.1f m from the target"):format(combo.stage, math.sqrt(combo.stick.x ^ 2 + combo.stick.z ^ 2)))
-            end
-            tr:set_Position(Vector3f.new(t.x + combo.stick.x, p.y, t.z + combo.stick.z))
-            local dx, dz = -combo.stick.x, -combo.stick.z
+            local dx, dz = t.x - p.x, t.z - p.z
             if dx * dx + dz * dz > 0.0001 then
                 tr:set_Rotation(yaw_rotation(dx, dz))
                 face(a, dx, dz)
@@ -4389,10 +4425,26 @@ local function combo_update(a)
     end
     if part.to and fr >= part.to then
         if combo.stage == 1 and not combo.target then
+            -- If the narrow opening kick hitbox barely missed, lock onto the aimed target if within 4.8m
+            if combo.aim and is_alive(combo.aim) then
+                pcall(function()
+                    local p1 = tr:get_Position()
+                    local p2 = combo.aim:get_GameObject():get_Transform():get_Position()
+                    local dx, dz = p1.x - p2.x, p1.z - p2.z
+                    if (dx * dx + dz * dz) <= (4.8 * 4.8) then
+                        combo.target = combo.aim
+                    end
+                end)
+            end
+        end
+        if combo.stage == 1 and not combo.target then
             pcall(function() combo_request(a, a:is_grounded() == false and "WaitToFall" or "NormalLocomotion") end)
             return combo_end("the opening hit nothing")
         end
         if not is_alive(combo.target) then return combo_end("target gone") end
+        if a:is_grounded() ~= false then
+            pcall(function() combo.safePos = tr:get_Position() end)
+        end
         local nk = combo.stage + 1
         local dest, rot, dx, dz
         if cfg.comboDynamic then dest, rot, dx, dz = dynamic_spot(a, nk)
@@ -4407,18 +4459,15 @@ local function combo_update(a)
         end
         if dbg.ai then pcall(dbg.ai.warp, a) end
         cues(a, useWisps and {} or CUE.depart_efx, CUE.depart_snd, tr:get_Position(), tr:get_Rotation())
-        tr:set_Position(dest)
-        tr:set_Rotation(rot)
-        pcall(function() a.character["<CharaController>k__BackingField"]:call("warp") end)
+        safe_character_warp(a, dest, rot)
         face(a, dx, dz)
-        combo.reapply = { dest = dest, rot = rot, dx = dx, dz = dz, n = 2 }
         cues(a, useWisps and {} or CUE.arrive_efx, CUE.arrive_snd, dest, rot)
         if useWisps then pcall(wisps.burst, a, true) end
         combo_stage(a, nk)
     end
 end
 re.on_pre_application_entry("UpdateBehavior", function()
-    if combo.stage == 0 and not combo.want and not combo.swordWait and not combo.bufferUntil then return end
+    if combo.stage == 0 and not combo.want and not combo.swordWait and not combo.bufferUntil and not (combo.safePos and combo.t0 and os.clock() - combo.t0 < 4.5) then return end
     local a = runtime.player()
     if not a or not a:valid() or not live.on then combo.want = false; combo_end("Pactblade off"); return end
     local ok, err = pcall(combo_update, a)
@@ -5777,27 +5826,27 @@ end)()
         end
     end
 
-    -- 4. Stormblade 5 Rank-Scaled Augmentations (Fulmination, Conductivity, Aegis of the Storm, Overload, Eye of the Hurricane)
+    -- 4. Stormblade 5 Rank-Scaled Augmentations (Fulmination, Tempest Reflexes, Thew, Overload, Eye of the Hurricane)
     PB.AUGMENTS = {
-        { id = "fulmination",      rank = 2, dcp = 300,  vanilla_name = "Mettle",      name = "Fulmination",          desc = "+15 Strength & +15 Magick (300 Dcp)",                    ui_desc = "Increases your Strength and Magick by +15 while wielding a sword as a Stormblade." },
-        { id = "conductivity",     rank = 4, dcp = 900,  vanilla_name = "Provocation", name = "Conductivity",         desc = "+150 Max Stamina (900 Dcp)",                            ui_desc = "Bio-electrical conditioning increases your Maximum Stamina by +150." },
-        { id = "aegis",            rank = 6, dcp = 1800, vanilla_name = "Thew",        name = "Aegis of the Storm",   desc = "+45 Magick Defense (1800 Dcp)",                          ui_desc = "Wards your body with an electrostatic veil, increasing your Magick Defense by +45." },
-        { id = "overload",         rank = 8, dcp = 3000, vanilla_name = "Diligence",   name = "Overload",             desc = "+12% Thunder damage vs Weak / Drenched targets (3000 Dcp)", ui_desc = "Increases Thunder damage by +12% when striking monster weakpoints or drenched and shocked foes." },
-        { id = "eye_of_hurricane", rank = 9, dcp = 5000, vanilla_name = "Dominion",    name = "Eye of the Hurricane", desc = "-10% Stamina cost on skills (5000 Dcp)",                 ui_desc = "Calm focus at the center of the storm reduces the Stamina cost of all skills by 10%." },
+        { id = "fulmination",      rank = 2, dcp = 300,  vanilla_name = "Mettle",      name = "Fulmination",          desc = "+15 Strength & +15 Magick (300 Dcp)",                        ui_desc = "Increases your Strength and Magick by +15 while wielding a sword as a Stormblade." },
+        { id = "tempest_reflexes", rank = 4, dcp = 900,  vanilla_name = "Provocation", name = "Tempest Reflexes",     desc = "+10% Sword Attack Speed (900 Dcp)",                          ui_desc = "Hones your reflexes with lightning currents, increasing your sword attack speed by +10%." },
+        { id = "thew",             rank = 6, dcp = 1800, vanilla_name = "Thew",        name = "Thew",                 desc = "Carry Additional Weight (+10 kg) (1800 Dcp)",                 ui_desc = "Enables you to carry additional weight." },
+        { id = "overload",         rank = 8, dcp = 3000, vanilla_name = "Diligence",   name = "Overload",             desc = "+12% Thunder damage vs Weak / Drenched targets (3000 Dcp)",  ui_desc = "Increases Thunder damage by +12% when striking monster weakpoints or drenched and shocked foes." },
+        { id = "eye_of_hurricane", rank = 9, dcp = 5000, vanilla_name = "Dominion",    name = "Eye of the Hurricane", desc = "Knockdown Power & -10% Skill Stamina Cost (5000 Dcp)",       ui_desc = "Augments the Knockdown Power of your normal attacks and reduces the Stamina cost of all skills by 10%." },
     }
     PB.augment_ability_ids = {}
     PB.augments_unlock_all = false -- Progressive unlock by Stormblade Vocation Rank (Ranks 2, 4, 6, 8, 9)
     PB.augments_enabled = {
         fulmination = true,
-        conductivity = true,
-        aegis = true,
+        tempest_reflexes = true,
+        thew = true,
         overload = true,
         eye_of_hurricane = true,
     }
     PB.augment_ranks = {
         fulmination = 2,
-        conductivity = 4,
-        aegis = 6,
+        tempest_reflexes = 4,
+        thew = 6,
         overload = 8,
         eye_of_hurricane = 9,
     }
@@ -5823,8 +5872,9 @@ end)()
     function PB.has_augment(id)
         if not live.on or PB.activeVocation ~= "stormblade" then return false end
         if PB.augments_enabled[id] == false then return false end
+        local req = PB.augment_ranks[id]
+        if not req then return false end
         if PB.augments_unlock_all then return true end
-        local req = PB.augment_ranks[id] or 1
         if PB.stormblade_rank() < req then return false end
         local aid = PB.augment_ability_ids and PB.augment_ability_ids[id]
         if aid then
@@ -5833,13 +5883,42 @@ end)()
                 local a = runtime.player()
                 local ctx = a and a.human and a.human["<SkillContext>k__BackingField"]
                 if ctx then
+                    PB.checkingAugment = true
                     bought = (ctx:call("isAbilityEnable(app.HumanAbilityID)", aid) == true)
+                    PB.checkingAugment = false
                 end
             end)
+            PB.checkingAugment = false
             if bought ~= nil then return bought end
         end
         return true
     end
+
+    -- Neutralize Provocation's native tank aggro in combat while allowing Tempest Reflexes (same slot) to be equipped
+    pcall(function()
+        local scTd = sdk.find_type_definition("app.HumanSkillContext")
+        local isAbM = scTd and scTd:get_method("isAbilityEnable(app.HumanAbilityID)")
+        if isAbM then
+            sdk.hook(isAbM, function(args)
+                local st = thread.get_hook_storage()
+                st.sbBlockProvocation = nil
+                if not live.on or PB.activeVocation ~= "stormblade" or PB.checkingAugment or PB.inGuildUi then return end
+                local provAid = PB.augment_ability_ids and PB.augment_ability_ids["tempest_reflexes"]
+                if not provAid then return end
+                local aid = sdk.to_int64(args[3]) & 0xFFFFFFFF
+                if aid == provAid and live.ctx and sdk.to_int64(args[2]) == live.ctx then
+                    st.sbBlockProvocation = true
+                end
+            end, function(r)
+                local st = thread.get_hook_storage()
+                if st.sbBlockProvocation then
+                    st.sbBlockProvocation = nil
+                    return sdk.to_ptr(0)
+                end
+                return r
+            end)
+        end
+    end)
 
     -- Overload (Rank 8): +12% Thunder damage on weak-point or drenched/tarred targets
     function PB.overload_mul(info, isThunder)
@@ -6260,7 +6339,7 @@ end)()
             local plan = sd and sd.state and sd.state.plan
             local item = plan and plan.custom and plan.custom[id]
             local packId = item and item.entry and item.entry.pack_id
-            return packId ~= nil and packId ~= "stormblade"
+            return (id >= 100 and item == nil) or (packId ~= nil and packId ~= "stormblade")
         end)
         return ok and foreign == true
     end
@@ -6279,118 +6358,111 @@ end)()
     local origCustomRanks = {}
     local origNormalRanks = {}
     local origAbilityRanks = {}
-    local AUG_ID_BY_RANK = { [2] = "fulmination", [4] = "conductivity", [6] = "aegis", [8] = "overload", [9] = "eye_of_hurricane" }
+    local AUG_ID_BY_RANK = { [2] = "fulmination", [4] = "tempest_reflexes", [6] = "thew", [8] = "overload", [9] = "eye_of_hurricane" }
+    local VANILLA_AUG_RANKS = { 2, 4, 6, 8, 9 }
     local guildDefsHidden = false
+    local lastGuildStateKey = nil
+
+    -- Safe C# Dictionary iteration via _entries (NEVER calls get_Item, so zero KeyNotFoundExceptions in REFramework!)
+    local function each_dict_entry(dict, fn)
+        if not dict then return end
+        pcall(function()
+            local entries = dict._entries
+            local count = dict._count or 0
+            if not entries or count <= 0 then return end
+            local slotIdx = 0
+            for i = 0, count - 1 do
+                local e = entries[i]
+                if e then
+                    local rawK = e.key
+                    local k = tonumber(rawK)
+                    if not k and rawK ~= nil then
+                        pcall(function() k = tonumber(rawK.value__) or tonumber(rawK.m_value) end)
+                    end
+                    local v = e.value
+                    if k and k >= 0 and v then
+                        slotIdx = slotIdx + 1
+                        fn(k, v, slotIdx)
+                    end
+                end
+            end
+        end)
+    end
 
     function PB.update_stormblade_guild_defs(forceRestore)
         local wantHide = (not forceRestore) and (not dbg.guardHold) and live.on and (PB.activeVocation == "stormblade")
         if not wantHide and not guildDefsHidden then return end
+        local sbRank = wantHide and PB.stormblade_rank() or 0
+        local stateKey = tostring(wantHide) .. "|" .. tostring(sbRank) .. "|" .. tostring(PB.augments_unlock_all)
+        if not forceRestore and stateKey == lastGuildStateKey then return end
         local gm = sdk.get_managed_singleton("app.GuiManager")
         if not gm or not gm.CustomSkillDefineDictionary or not gm.NormalSkillDefineDictionary then return end
         local cdict = gm.CustomSkillDefineDictionary
         local jdict = gm.CustomSkillJobDefineDictionary and gm.CustomSkillJobDefineDictionary[1]
-        local ndict = gm.NormalSkillDefineDictionary["Job01"]
+        local ndict = gm.NormalSkillDefineDictionary and gm.NormalSkillDefineDictionary["Job01"]
         local adict = gm.AbilityDefineDictionary and gm.AbilityDefineDictionary["Job01"]
         local shieldIds = get_shield_custom_ids()
 
         if wantHide then
-            for sid in pairs(shieldIds) do
-                for _, d in ipairs({ cdict, jdict }) do
-                    if d then
-                        pcall(function()
-                            local levels = d[sid]
-                            if not levels then return end
-                            origCustomRanks[sid] = origCustomRanks[sid] or {}
-                            for lv = 1, 3 do
-                                pcall(function()
-                                    local p = levels[lv]
-                                    if p and p._UnlockRank ~= 99 then
-                                        if origCustomRanks[sid][lv] == nil then origCustomRanks[sid][lv] = p._UnlockRank end
-                                        p._UnlockRank = 99
-                                    end
-                                end)
+            for _, d in ipairs({ cdict, jdict }) do
+                each_dict_entry(d, function(sid, levels)
+                    if shieldIds[sid] then
+                        origCustomRanks[sid] = origCustomRanks[sid] or {}
+                        each_dict_entry(levels, function(lv, p)
+                            if p._UnlockRank and p._UnlockRank ~= 99 then
+                                if origCustomRanks[sid][lv] == nil then origCustomRanks[sid][lv] = p._UnlockRank end
+                                p._UnlockRank = 99
                             end
                         end)
                     end
-                end
-            end
-            if ndict then
-                for nid in pairs(SHIELD_NORMAL_IDS) do
-                    pcall(function()
-                        local p = ndict[nid]
-                        if p and p._UnlockRank ~= 99 then
-                            if origNormalRanks[nid] == nil then origNormalRanks[nid] = p._UnlockRank end
-                            p._UnlockRank = 99
-                        end
-                    end)
-                end
-            end
-            if adict then
-                local sbRank = PB.stormblade_rank()
-                pcall(function()
-                    local entries = adict._entries
-                    for i = 0, (adict._count or 0) - 1 do
-                        local e = entries[i]
-                        local aid = e and tonumber(e.key)
-                        local p = e and e.value
-                        if aid and p then
-                            if origAbilityRanks[aid] == nil and p._UnlockRank ~= 99 and p._UnlockRank ~= 1 then
-                                origAbilityRanks[aid] = p._UnlockRank
-                            end
-                            local baseRank = origAbilityRanks[aid]
-                            if baseRank then
-                                local augId = AUG_ID_BY_RANK[baseRank]
-                                if augId then PB.augment_ability_ids[augId] = aid end
-                                if PB.augments_unlock_all or sbRank >= baseRank then
-                                    p._UnlockRank = 1
-                                else
-                                    p._UnlockRank = 99
-                                end
-                            end
-                        end
-                    end
                 end)
             end
+            each_dict_entry(ndict, function(nid, p)
+                if SHIELD_NORMAL_IDS[nid] and p._UnlockRank and p._UnlockRank ~= 99 then
+                    if origNormalRanks[nid] == nil then origNormalRanks[nid] = p._UnlockRank end
+                    p._UnlockRank = 99
+                end
+            end)
+            each_dict_entry(adict, function(aid, p, slotIdx)
+                if origAbilityRanks[aid] == nil then
+                    if p._UnlockRank and p._UnlockRank ~= 99 and p._UnlockRank ~= 1 then
+                        origAbilityRanks[aid] = p._UnlockRank
+                    else
+                        origAbilityRanks[aid] = VANILLA_AUG_RANKS[slotIdx] or 9
+                    end
+                end
+                local baseRank = origAbilityRanks[aid]
+                if baseRank then
+                    local augId = AUG_ID_BY_RANK[baseRank]
+                    if augId then PB.augment_ability_ids[augId] = aid end
+                    if PB.augments_unlock_all or sbRank >= baseRank then
+                        p._UnlockRank = 1
+                    else
+                        p._UnlockRank = 99
+                    end
+                end
+            end)
             guildDefsHidden = true
+            lastGuildStateKey = stateKey
         else
-            for sid, lvs in pairs(origCustomRanks) do
-                for _, d in ipairs({ cdict, jdict }) do
-                    if d then
-                        pcall(function()
-                            local levels = d[sid]
-                            if not levels then return end
-                            for lv, rnk in pairs(lvs) do
-                                pcall(function()
-                                    local p = levels[lv]
-                                    if p then p._UnlockRank = rnk end
-                                end)
-                            end
+            for _, d in ipairs({ cdict, jdict }) do
+                each_dict_entry(d, function(sid, levels)
+                    local lvs = origCustomRanks[sid]
+                    if lvs then
+                        each_dict_entry(levels, function(lv, p)
+                            if lvs[lv] ~= nil then p._UnlockRank = lvs[lv] end
                         end)
-                    end
-                end
-            end
-            if ndict then
-                for nid, rnk in pairs(origNormalRanks) do
-                    pcall(function()
-                        local p = ndict[nid]
-                        if p then p._UnlockRank = rnk end
-                    end)
-                end
-            end
-            if adict then
-                pcall(function()
-                    local entries = adict._entries
-                    for i = 0, (adict._count or 0) - 1 do
-                        local e = entries[i]
-                        local aid = e and tonumber(e.key)
-                        local p = e and e.value
-                        if aid and p and origAbilityRanks[aid] then
-                            p._UnlockRank = origAbilityRanks[aid]
-                        end
                     end
                 end)
             end
+            each_dict_entry(ndict, function(nid, p)
+                if origNormalRanks[nid] ~= nil then p._UnlockRank = origNormalRanks[nid] end
+            end)
+            each_dict_entry(adict, function(aid, p)
+                if origAbilityRanks[aid] ~= nil then p._UnlockRank = origAbilityRanks[aid] end
+            end)
             guildDefsHidden = false
+            lastGuildStateKey = stateKey
         end
     end
 
@@ -6475,26 +6547,44 @@ end)()
                     local list = found[LIST_TYPE]
                     if list then filter_main_contents_list(list) end
                 end)
-            end, function(r) return r end)
+            end, function(r)
+                if PB.lastGuildUi and PB.retext_stormblade_augments then
+                    pcall(PB.retext_stormblade_augments, PB.lastGuildUi)
+                end
+                return r
+            end)
         end
 
         -- Rename the 5 Fighter Augments in the Vocation Guild (Mettle, Provocation, Thew, Diligence, Dominion) to Stormblade's 5 Augmentations
         local AUG_BY_NAME = {
-            ["Mettle"]      = PB.AUGMENTS[1],
-            ["Provocation"] = PB.AUGMENTS[2],
-            ["Thew"]        = PB.AUGMENTS[3],
-            ["Diligence"]   = PB.AUGMENTS[4],
-            ["Dominion"]    = PB.AUGMENTS[5],
+            ["Mettle"]             = PB.AUGMENTS[1],
+            ["Provocation"]        = PB.AUGMENTS[2],
+            ["Conductivity"]       = PB.AUGMENTS[2],
+            ["Thew"]               = PB.AUGMENTS[3],
+            ["Aegis of the Storm"] = PB.AUGMENTS[3],
+            ["Diligence"]          = PB.AUGMENTS[4],
+            ["Dominion"]           = PB.AUGMENTS[5],
         }
         local AUG_BY_DESC = {
             ["Augments your physical Defense."] = PB.AUGMENTS[1],
             ["Increases the likelihood of your being targeted by foes."] = PB.AUGMENTS[2],
+            ["Bio-electrical conditioning increases your Maximum Stamina by +150."] = PB.AUGMENTS[2],
             ["Enables you to carry additional weight."] = PB.AUGMENTS[3],
+            ["Wards your body with an electrostatic veil, increasing your Magick Defense by +45."] = PB.AUGMENTS[3],
             ["Hastens recovery when downed or crawling."] = PB.AUGMENTS[4],
             ["Augments the Knockdown Power of your normal attacks."] = PB.AUGMENTS[5],
         }
+        local function match_aug_desc(clean)
+            if AUG_BY_DESC[clean] then return AUG_BY_DESC[clean] end
+            if clean:find("targeted by foes", 1, true) then return PB.AUGMENTS[2] end
+            if clean:find("physical Defense", 1, true) then return PB.AUGMENTS[1] end
+            if clean:find("downed or crawling", 1, true) then return PB.AUGMENTS[4] end
+            if clean:find("Knockdown Power of your normal attacks", 1, true) and not clean:find("10%", 1, true) then return PB.AUGMENTS[5] end
+            return nil
+        end
         local function retext_stormblade_augments(this)
             if not this or not live.on or PB.activeVocation ~= "stormblade" then return end
+            PB.inGuildUi = true
             pcall(function()
                 local sl = this._Main_ContentsListCtrl
                 if sl and sl.InfoList and sl.ItemList then
@@ -6519,17 +6609,17 @@ end)()
                 local root = this:get_field("Root") or this.Root
                 if not root then return end
                 local function walk(c, depth)
-                    if not c or depth > 14 then return end
+                    if not c or depth > 24 then return end
                     pcall(function()
                         if c:get_type_definition():is_a("via.gui.Text") then
                             local msg = c:call("get_Message")
                             if msg then
-                                local clean = tostring(msg):gsub("<[^>]*>", "")
-                                local byN = AUG_BY_NAME[clean]
+                                local clean = tostring(msg):gsub("<[^>]*>", ""):gsub("%s+", " "):match("^%s*(.-)%s*$")
+                                local byN = clean and AUG_BY_NAME[clean]
                                 if byN then
                                     c:call("set_Message", byN.name)
-                                else
-                                    local byD = AUG_BY_DESC[clean]
+                                elseif clean then
+                                    local byD = match_aug_desc(clean)
                                     if byD then c:call("set_Message", byD.ui_desc) end
                                 end
                             end
@@ -6546,18 +6636,32 @@ end)()
                 end
                 walk(root, 0)
             end)
+            PB.inGuildUi = false
         end
+        PB.retext_stormblade_augments = retext_stormblade_augments
         if uiTd then
-            for _, sig in ipairs({ "getCharaId()", "setupContents(System.Int32)", "setupAbilityInfoWindow", "setupAbilityMenu" }) do
-                local m = uiTd:get_method(sig)
-                if m then
-                    sdk.hook(m, function(args)
-                        thread.get_hook_storage().sbUiThis = sdk.to_managed_object(args[2])
-                    end, function(r)
-                        local this = thread.get_hook_storage().sbUiThis
-                        if this then retext_stormblade_augments(this) end
-                        return r
-                    end)
+            for _, m in ipairs(uiTd:get_methods()) do
+                local ok, name = pcall(function() return m:get_name() end)
+                if ok and name and (
+                    name == "getCharaId"
+                    or name == "setupContents"
+                    or name:find("Ability", 1, true)
+                    or name:find("InfoWindow", 1, true)
+                ) then
+                    local okG, isGen = pcall(function() return m:is_generic() end)
+                    if not (okG and isGen) then
+                        pcall(function()
+                            sdk.hook(m, function(args)
+                                local this = sdk.to_managed_object(args[2])
+                                thread.get_hook_storage().sbUiThis = this
+                                PB.lastGuildUi = this
+                            end, function(r)
+                                local this = thread.get_hook_storage().sbUiThis
+                                if this then retext_stormblade_augments(this) end
+                                return r
+                            end)
+                        end)
+                    end
                 end
             end
         end
@@ -6583,16 +6687,6 @@ end)()
         pcall(PB.update_stormblade_guild_defs, false)
     end)
 end)()
-
-re.on_frame(function()
-    local r = combo.result
-    if not r or os.clock() - r.t > 4 then return end
-    pcall(function()
-        local col = r.ok and 0xFF40FF40 or 0xFF4040FF   -- ABGR: green / red
-        draw.text(r.text, 60, 220, 0xFF000000)
-        draw.text(r.text, 59, 219, col)
-    end)
-end)
 
 -- time skip to `hour`:00 where the player stands (app.TimeSkipManager.requestPlayerWarp, as Nick's Devtools do)
 function dbg.day_skip(hour)

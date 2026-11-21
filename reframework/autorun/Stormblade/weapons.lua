@@ -7,9 +7,9 @@
 local core = require("Stormblade.core")
 local weapons = {}
 
--- Balanced Ratios: 70% physical (agile 1H fast-cadence weight) + 65% magick (scales shells & boon natively)
+-- Balanced Ratios: 62% physical (balanced for +10% Tempest Reflexes attack speed) + 65% magick (scales shells & boon natively)
 -- Weapon _Element is preserved (not forced to 3) so unsheathed Thunder Boon doesn't double-dip on light slashes
-local PHYS_RATIO = 0.70
+local PHYS_RATIO = 0.62
 local MAG_RATIO = 0.65
 
 -- Active sword backup to guarantee clean restore

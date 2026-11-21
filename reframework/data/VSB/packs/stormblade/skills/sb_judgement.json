@@ -37,6 +37,10 @@
   "trigger": {
     "type": "slot"
   },
+  "end": {
+    "at_frame": 48,
+    "exit_action": "NormalLocomotion"
+  },
   "timeline": [
     {
       "id": "turn_target",
@@ -44,14 +48,14 @@
       "frame": 0,
       "turn": "enemy",
       "turn_speed": 5.0,
-      "enemy_range": 25.0
+      "enemy_range": 20.0
     },
     {
       "id": "cast_anim",
       "type": "action",
       "frame": 0,
-      "action": "Job07_MagicBindComplete",
-      "speed": 1.05
+      "action": "Job01_TuskToss",
+      "speed": 1.15
     },
     {
       "id": "thunder_buff",
@@ -65,7 +69,7 @@
       "id": "cast_armor",
       "type": "hit",
       "frame": 0,
-      "until": 70,
+      "until": 46,
       "super_armor": true,
       "element": "Thunder",
       "attack_rate": 1.0
@@ -76,140 +80,106 @@
       "frame": 6,
       "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
       "shell_id": 7,
+      "cosmetic": true,
       "cast": {
         "mode": "owner",
-        "offset": [0.0, 1.0, 0.5],
+        "offset": [0.0, 1.1, 0.6],
         "face": "owner"
       },
-      "element": "Thunder",
-      "attack_rate": 0.25,
       "color": [50, 180, 255, 255],
       "enabled": true
     },
     {
       "id": "bolt_1",
       "type": "shell",
-      "frame": 12,
+      "frame": 10,
       "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
       "shell_id": 8,
       "cast": {
-        "mode": "target",
+        "mode": "owner",
+        "offset": [0.0, 0.0, 3.5],
+        "face": "owner",
         "lock_target": "enemy",
-        "lock_range": 35.0,
-        "face": "crosshair"
+        "lock_range": 14.0
       },
       "element": "Thunder",
-      "attack_rate": 0.55,
-      "damage_type": "Hitback_L",
-      "color": [50, 180, 255, 255],
-      "enabled": true
-    },
-    {
-      "id": "flash_1",
-      "type": "shell",
-      "frame": 12,
-      "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
-      "shell_id": 7,
-      "cast": {
-        "mode": "target",
-        "lock_target": "enemy",
-        "lock_range": 35.0,
-        "face": "crosshair"
-      },
-      "element": "Thunder",
-      "attack_rate": 0.15,
+      "attack_rate": 0.45,
+      "damage_type": "Hitback_M",
       "color": [50, 180, 255, 255],
       "enabled": true
     },
     {
       "id": "bolt_2",
       "type": "shell",
-      "frame": 20,
+      "frame": 18,
       "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
       "shell_id": 8,
       "cast": {
         "mode": "owner",
-        "offset": [-2.0, 0.0, 3.2],
-        "face": "owner",
-        "lock_target": "enemy",
-        "lock_range": 20.0
+        "offset": [-2.2, 0.0, 3.2],
+        "face": "owner"
       },
       "element": "Thunder",
-      "attack_rate": 0.45,
-      "damage_type": "Hitback_L",
+      "attack_rate": 0.40,
+      "damage_type": "Hitback_M",
       "color": [50, 180, 255, 255],
       "enabled": true
     },
     {
       "id": "bolt_3",
       "type": "shell",
-      "frame": 28,
+      "frame": 26,
       "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
       "shell_id": 8,
       "cast": {
         "mode": "owner",
-        "offset": [2.0, 0.0, 3.2],
-        "face": "owner",
-        "lock_target": "enemy",
-        "lock_range": 20.0
+        "offset": [2.2, 0.0, 3.2],
+        "face": "owner"
       },
       "element": "Thunder",
-      "attack_rate": 0.45,
-      "damage_type": "Hitback_L",
+      "attack_rate": 0.40,
+      "damage_type": "Hitback_M",
       "color": [50, 180, 255, 255],
       "enabled": true
     },
     {
       "id": "bolt_4",
       "type": "shell",
-      "frame": 36,
+      "frame": 34,
       "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
       "shell_id": 8,
       "cast": {
         "mode": "owner",
-        "offset": [0.0, 0.0, 5.2],
-        "face": "owner",
-        "lock_target": "enemy",
-        "lock_range": 25.0
+        "offset": [-1.5, 0.0, 5.8],
+        "face": "owner"
       },
       "element": "Thunder",
-      "attack_rate": 0.45,
-      "damage_type": "Hitback_L",
+      "attack_rate": 0.40,
+      "damage_type": "Hitback_M",
       "color": [50, 180, 255, 255],
       "enabled": true
+    },
+    {
+      "id": "cancel_early",
+      "type": "flow",
+      "op": "cancel_window",
+      "frame": 36,
+      "until_frame": 52
     },
     {
       "id": "bolt_5_finale",
       "type": "shell",
-      "frame": 44,
+      "frame": 42,
       "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
       "shell_id": 8,
       "cast": {
-        "mode": "target",
-        "lock_target": "enemy",
-        "lock_range": 35.0,
-        "face": "crosshair"
+        "mode": "owner",
+        "offset": [1.5, 0.0, 5.8],
+        "face": "owner"
       },
       "element": "Thunder",
-      "attack_rate": 0.85,
-      "damage_type": "Hitback_LLL",
-      "color": [50, 180, 255, 255],
-      "enabled": true
-    },
-    {
-      "id": "flash_5_finale",
-      "type": "shell",
-      "frame": 44,
-      "shell": "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
-      "shell_id": 7,
-      "cast": {
-        "mode": "target",
-        "lock_target": "enemy",
-        "lock_range": 35.0,
-        "face": "crosshair"
-      },
-      "element": "Thunder",
-      "attack_rate": 0.20,
+      "attack_rate": 0.50,
+      "damage_type": "Hitback_M",
       "color": [50, 180, 255, 255],
       "enabled": true
     }
