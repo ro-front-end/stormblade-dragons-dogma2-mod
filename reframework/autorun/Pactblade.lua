@@ -17,7 +17,8 @@ do
     if RELEASE then
         local KEEP = { [PB.DATA] = true, ["Pactblade_guise_items.json"] = true, ["Pactblade_vsb_pick.json"] = true,
                        ["Pactblade_guise_sounds.json"] = true, ["Pactblade_trace.json"] = true,
-                       ["Pactblade_slots.json"] = true }
+                       ["Pactblade_slots.json"] = true, ["VSB/state/boot_guard.json"] = true,
+                       ["DragonCore/boot_guard.json"] = true }
         local real = json
         json = setmetatable({ RELEASE = true,
             dump_file = function(name, ...) if KEEP[name] then return real.dump_file(name, ...) end return true end },
@@ -566,7 +567,7 @@ local function vsb_state()
     return "not picked"
 end
 
-;(function()   -- the VSB pick kept over a script reset (always preserves stormblade)
+;(function()   -- the VSB pick, custom vocation progress, and learned/equipped skills kept over a script reset
     local FILE = "Pactblade_vsb_pick.json"
     re.on_script_reset(function()
         local curPick = PB.activeVocation or "stormblade"
@@ -583,10 +584,44 @@ end
         local app = api and api.app
         if app and app.picks and app.set_vocation_pick then
             tries = -1
-            if app.picks.Job01 == nil or app.picks.Job01 == "pactblade" then
-                local ok, e = pcall(app.set_vocation_pick, app, "Job01", wantVoc)
-                note(ok and ("script reset: " .. wantVoc .. " picked in VSB again") or ("script reset: re-pick failed: " .. tostring(e)))
-            end
+            pcall(function()
+                local integ = package.loaded["VSB.game.integration"] or require("VSB.game.integration")
+                local ss = package.loaded["VSB.game.savesafety"] or require("VSB.game.savesafety")
+                local vp = package.loaded["VSB.game.vocprogress"] or require("VSB.game.vocprogress")
+                -- Find the most recent valid Stormblade save sidecar (slot_0, slot_4, slot_1)
+                local bestSlot, bestData = nil, nil
+                for _, sl in ipairs({ 0, 4, 1 }) do
+                    local d = json.load_file(("VSB/state/saves/slot_%d.json"):format(sl))
+                    if type(d) == "table" and d.vocation_progress and d.vocation_progress.points and (tonumber(d.vocation_progress.points.stormblade) or 0) > 0 then
+                        bestSlot, bestData = sl, d
+                        break
+                    end
+                end
+                if vp and bestData and bestData.vocation_progress then
+                    local curPts = vp.points_of and vp.points_of("stormblade") or 0
+                    if curPts <= 0 then
+                        pcall(vp.set, bestData.vocation_progress)
+                    end
+                end
+                if ss and ss.status and bestData then
+                    if ss.status.current_slot == nil then ss.status.current_slot = bestSlot end
+                    if ss.status.memory == nil then
+                        ss.status.memory = bestData
+                        ss.status.reapply = true
+                    end
+                end
+                if app.picks.Job01 == nil or app.picks.Job01 == "pactblade" then
+                    if integ and integ.pick_vocation then
+                        pcall(integ.pick_vocation, "Job01", wantVoc)
+                    else
+                        pcall(app.set_vocation_pick, app, "Job01", wantVoc)
+                    end
+                end
+                if integ and integ.rebuild then
+                    pcall(integ.rebuild)
+                end
+            end)
+            note("script reset: " .. wantVoc .. " progress & skill plan synchronized in VSB")
         elseif tries > 1200 then tries = -1; note("script reset: VSB not found - vocation not re-picked") end
     end
     re.on_frame(function() pcall(again) end)
@@ -5656,8 +5691,9 @@ end)()
             end)
         end
 
-        -- Maintain native Thunder Boon crackling electricity on the sword ONLY when unsheathed
-        if a.character then
+        -- Thunder Boon crackling electricity on the sword (managed in one place with a 0.35s throttle to avoid duplicate C# BuffBase updates)
+        if a.character and (now - (PB.lastBoonCheckAt or 0) >= 0.35) then
+            PB.lastBoonCheckAt = now
             pcall(function()
                 local st = require("DragonCore.game.statuses")
                 if a:weapon_drawn() then
@@ -6654,10 +6690,8 @@ end)()
                     name == "getCharaId"
                     or name == "setupContents"
                     or name:find("Ability", 1, true)
-                    or name:find("InfoWindow", 1, true)
-                    or name:find("Select", 1, true)
-                    or name:find("Cursor", 1, true)
-                    or name:find("Detail", 1, true)
+                    or name == "setupCustomSkillInfoWindow"
+                    or name == "setupNormalSkillInfoWindow"
                 ) then
                     local okG, isGen = pcall(function() return m:is_generic() end)
                     if not (okG and isGen) then
@@ -6693,13 +6727,25 @@ end)()
         update_stormblade_skills()
     end)
     local lastGuildRetextClock = 0
+    local bootGuardCleared = false
     re.on_frame(function()
+        if not bootGuardCleared then
+            bootGuardCleared = true
+            pcall(json.dump_file, "VSB/state/boot_guard.json", { starting = false })
+            pcall(json.dump_file, "DragonCore/boot_guard.json", { starting = false })
+            pcall(function()
+                local iui = package.loaded["VSB.ui.integration_ui"]
+                if iui and iui.boot and iui.boot.skipped then
+                    iui.boot.skipped = false
+                end
+            end)
+        end
         pcall(PB.update_stormblade_armor, false)
         pcall(PB.update_stormblade_augments, false)
         pcall(PB.update_stormblade_guild_defs, false)
         if PB.lastGuildUi and PB.retext_stormblade_augments and live.on and PB.activeVocation == "stormblade" then
             local now = os.clock()
-            if now - lastGuildRetextClock > 0.15 then
+            if now - lastGuildRetextClock > 0.20 then
                 lastGuildRetextClock = now
                 pcall(function()
                     local root = PB.lastGuildUi:get_field("Root") or PB.lastGuildUi.Root
