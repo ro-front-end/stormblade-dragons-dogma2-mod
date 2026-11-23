@@ -3328,6 +3328,35 @@ function PB.player_strength()
     return str
 end
 
+-- Classify enemy victim for Lightning Javelin vs Judgement knockdown rules:
+-- Returns isSmallFlyer (Harpies/Succubi/Goreharpies ch222* or small airborne enemy), isLargeMonster (Bosses/Large monsters ch25*/ch299* like Dragons, Minotaurs, Chimeras, Ogres, Cyclopes, Griffins)
+function PB.classify_victim(info)
+    local isSmallFlyer, isLargeMonster = false, false
+    pcall(function()
+        local victim = info and info["<DamageGameObject>k__BackingField"]
+        if not victim then return end
+        local vname = tostring(victim:call("get_Name") or ""):lower()
+        local ch = victim:call("getComponent(System.Type)", sdk.typeof("app.Character"))
+        local maxHp = 0
+        local isAir = false
+        if ch then
+            pcall(function()
+                local hit = ch["<Hit>k__BackingField"] or ch:call("get_Hit")
+                if hit then maxHp = tonumber(hit:call("get_MaxHp")) or 0 end
+            end)
+            pcall(function()
+                isAir = (ch:call("get_IsGround") == false)
+            end)
+        end
+        if vname:find("ch25", 1, true) or vname:find("ch299", 1, true) or maxHp >= 4500 then
+            isLargeMonster = true
+        elseif vname:find("ch222", 1, true) or (isAir and maxHp > 0 and maxHp < 3500) then
+            isSmallFlyer = true
+        end
+    end)
+    return isSmallFlyer, isLargeMonster
+end
+
 pcall(function()
     sdk.hook(sdk.find_type_definition("app.HitController"):get_method("calcDamageValue(app.HitController.DamageInfo)"),
         function(args)
@@ -3480,19 +3509,38 @@ pcall(function()
                         info.Damage = dmg
                     end
                     if kind == "javelin" or kind == "judgement" then
+                        local isSmallFlyer, isLargeMonster = PB.classify_victim(info)
                         pcall(function()
-                            info.DamageType = 6                     -- Hitback_M (clean flinch impact, NO stun / NO knockdown)
-                            info.DamageActType = 1                  -- Flinch (NOT Down / Stun)
-                            info.OverwriteBlownType = 6
-                            info.DamageReaction = 120               -- Moderate flinch stagger
-                            info.BlownReactionRate = 0
-                            info.BlownReactionConvertLevel = 0
-                            info.IsTwoRankUpReaction = false
-                            info.ForceFactor = 0
-                            info.HitBackZ = math.min(info.HitBackZ or 0, 1.2)
-                            info.HitBackY = 0                       -- Grounded, no lift!
-                            info.HitBackAddZ = 0
-                            info.HitBackVec = Vector3f.new(0, 0, 0)
+                            if kind == "javelin" and isSmallFlyer then
+                                -- Harpies / small flyers: clean knockdown out of the air to the ground (Hitdown_L = 12, zero horizontal launch!)
+                                info.DamageType = 12
+                                info.DamageActType = 12
+                                info.OverwriteBlownType = 12
+                                info.DamageReaction = 480
+                                info.BlownReactionRate = 0
+                                info.BlownReactionConvertLevel = 0
+                                info.IsTwoRankUpReaction = false
+                                info.ForceFactor = 0
+                                info.HitBackZ = 0
+                                info.HitBackY = 0
+                                info.HitBackAddZ = 0
+                                info.HitBackVec = Vector3f.new(0, 0, 0)
+                            else
+                                -- Grounded enemies & Large Monsters (Dragons, Minotaurs, Chimeras, Ogres): light flinch only, NEVER knocks down a dragon or large monster!
+                                info.DamageType = 6                     -- Hitback_M (clean flinch impact, NO stun / NO knockdown)
+                                info.DamageActType = 1                  -- Flinch (NOT Down / Stun)
+                                info.OverwriteBlownType = 6
+                                info.DamageReaction = isLargeMonster and 12 or 85
+                                info.StaminaDamage = isLargeMonster and 0 or (info.StaminaDamage or 0)
+                                info.BlownReactionRate = 0
+                                info.BlownReactionConvertLevel = 0
+                                info.IsTwoRankUpReaction = false
+                                info.ForceFactor = 0
+                                info.HitBackZ = math.min(info.HitBackZ or 0, 0.8)
+                                info.HitBackY = 0                       -- Grounded, no lift!
+                                info.HitBackAddZ = 0
+                                info.HitBackVec = Vector3f.new(0, 0, 0)
+                            end
                         end)
                         pcall(function()
                             local victim = info["<DamageGameObject>k__BackingField"]
@@ -3970,19 +4018,24 @@ pcall(function()
             s2.pbJavelin = nil
             if not info then return r end
             if isJav then
+                local isSmallFlyer, isLargeMonster = PB.classify_victim(info)
+                local reactType = isSmallFlyer and 12 or 6
                 pcall(function()
-                    info.DamageType = 6                     -- Hitback_M (clean flinch impact, NO stun)
-                    info.DamageActType = 1                  -- Flinch
-                    info.OverwriteBlownType = 6
-                    info.DamageReaction = 120               -- Moderate flinch stagger
+                    info.DamageType = reactType             -- 12 = Hitdown_L (drops harpies straight down), 6 = Hitback_M (flinch)
+                    info.DamageActType = isSmallFlyer and 12 or 1
+                    info.OverwriteBlownType = reactType
+                    info.DamageReaction = isSmallFlyer and 480 or (isLargeMonster and 12 or 85)
+                    if isLargeMonster then info.StaminaDamage = 0 end
                     info.BlownReactionRate = 0
                     info.BlownReactionConvertLevel = 0
-                    info.HitBackZ = math.min(info.HitBackZ or 0, 1.2)
+                    info.IsTwoRankUpReaction = false
+                    info.ForceFactor = 0
+                    info.HitBackZ = isSmallFlyer and 0 or math.min(info.HitBackZ or 0, 0.8)
                     info.HitBackY = 0
                     info.HitBackAddZ = 0
                     info.HitBackVec = Vector3f.new(0, 0, 0)
                 end)
-                return sdk.to_ptr(6)                        -- Return Hitback_M (flinch) to engine
+                return sdk.to_ptr(reactType)
             end
             local v = sdk.to_int64(r) & 0xFFFFFFFF
             if not HEAVIER[v] then return r end
@@ -5603,14 +5656,25 @@ end)()
                 PB.javelinT = now
                 local t = dbg.beam and dbg.beam.aim_pick and dbg.beam.aim_pick(a, 0.6)
                 local targetPos = nil
-                if t then pcall(function() targetPos = t:get_GameObject():get_Transform():get_Position() end) end
+                if t then
+                    pcall(function()
+                        local tr = t:get_GameObject():get_Transform()
+                        local p = tr:get_Position()
+                        local hip = t.Hip or tr:call("getJointByName", "Hip")
+                        if hip then
+                            local hp = hip:get_Position()
+                            if hp and math.abs(hp.y - p.y) < 12 then p = hp end
+                        end
+                        targetPos = p
+                    end)
+                end
                 local shell_node = {
                     type = "shell",
                     id = "sb_javelin",
                     shell = PB.JOBMAGIC_SHELLS or "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
                     shell_id = 8,
                     scale = 1.15,
-                    cast = targetPos and { mode = "target", lock_range = 12 } or { mode = "owner", offset = { 0, 0, 2.5 }, face = "owner" },
+                    cast = targetPos and { mode = "target" } or { mode = "owner", offset = { 0, 0, 2.5 }, face = "owner" },
                     element = "Thunder",
                     damage_type = "Hitback_M"
                 }
@@ -9637,11 +9701,15 @@ pcall(function()
             local jInfo = st.pbJavPow
             st.pbJavPow = nil
             if jInfo then
+                local isSmallFlyer, isLargeMonster = PB.classify_victim(jInfo)
                 pcall(function()
-                    jInfo.DamageReaction = 120
+                    jInfo.DamageReaction = isSmallFlyer and 480 or (isLargeMonster and 12 or 85)
+                    if isLargeMonster then jInfo.StaminaDamage = 0 end
                     jInfo.ForceFactor = 0
                     jInfo.BlownReactionRate = 0
+                    jInfo.HitBackZ = isSmallFlyer and 0 or math.min(jInfo.HitBackZ or 0, 0.8)
                     jInfo.HitBackY = 0
+                    jInfo.HitBackAddZ = 0
                     jInfo.HitBackVec = Vector3f.new(0, 0, 0)
                 end)
             end
