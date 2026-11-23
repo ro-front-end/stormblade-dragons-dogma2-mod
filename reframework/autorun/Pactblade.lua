@@ -5919,24 +5919,25 @@ end)()
     -- Job07 (Spearhand)     = 128
     -- Job08 (Magick Archer) = 256
     -- Job09 (Trickster)     = 512
-    local JOB_FIGHTER = 2
-    local JOB_MAGE    = 8
-    local JOB_WARRIOR = 32
-    local LIGHT_MASK  = 4 + 8 + 16 + 128 + 256 -- Archer(4) + Mage(8) + Thief(16) + Spearhand(128) + MagickArcher(256)
+    local JOB_FIGHTER  = 2
+    local JOB_MAGE     = 8
+    local JOB_WARRIOR  = 32
+    local JOB_SORCERER = 64
+    local LIGHT_MASK   = 4 + 8 + 16 + 64 + 128 + 256 -- Archer(4) + Mage(8) + Thief(16) + Sorcerer(64) + Spearhand(128) + MagickArcher(256)
 
     local function is_heavy_armor(entry, origJob)
         if origJob and origJob > 0 and origJob ~= 65535 then
             -- 1. If Vanilla Fighter (2) or Warrior (32) can wear it:
             if (origJob & (JOB_FIGHTER + JOB_WARRIOR)) ~= 0 then
-                -- Only allow if Mage (8) can ALSO wear it (universal light clothes/cloaks like Beseecher's Hood, Explorer's Boots)
-                if (origJob & JOB_MAGE) ~= 0 then
+                -- Only allow if Mage (8) or Sorcerer (64) can ALSO wear it (universal light clothes/cloaks/robes)
+                if (origJob & (JOB_MAGE + JOB_SORCERER)) ~= 0 then
                     return false -- Universal Light / All-Vocation piece -> ALLOWED
                 end
                 return true -- Fighter/Warrior armor (Sentry's Coif, Foot Soldier Armor, Chain Mail, Worker's Greaves) -> BLOCKED!
             end
-            -- 2. If Vanilla Fighter CANNOT wear it, allow if it belongs to Archer, Mage, Thief, Spearhand, or Magick Archer:
+            -- 2. If Vanilla Fighter CANNOT wear it, allow if it belongs to Archer, Mage, Thief, Sorcerer, Spearhand, or Magick Archer:
             if (origJob & LIGHT_MASK) ~= 0 then
-                return false -- Pure Light Armor (Felt Cap, Dyed-Cloth Mask, Brigand's Vest, Missionary's Robe, Woodland Boots) -> ALLOWED!
+                return false -- Pure Light/Caster Armor (Sorcerer robes/archistaff attire, Mage, Thief, Archer, Spearhand, Magick Archer) -> ALLOWED!
             end
             return true
         end
