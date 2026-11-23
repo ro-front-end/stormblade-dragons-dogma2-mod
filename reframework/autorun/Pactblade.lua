@@ -3510,13 +3510,21 @@ pcall(function()
                     end
                     if kind == "javelin" or kind == "judgement" then
                         local isSmallFlyer, isLargeMonster = PB.classify_victim(info)
+                        local isLethal = false
                         pcall(function()
-                            if kind == "javelin" and isSmallFlyer then
-                                -- Harpies / small flyers: clean knockdown out of the air to the ground (Hitdown_L = 12, zero horizontal launch!)
+                            local v = info["<DamageGameObject>k__BackingField"]
+                            local ch = v and v:call("getComponent(System.Type)", sdk.typeof("app.Character"))
+                            local hit = ch and (ch["<Hit>k__BackingField"] or ch:call("get_Hit"))
+                            if hit then isLethal = ((info.Damage or 0) >= (hit:call("get_Hp") or 999999)) end
+                        end)
+                        pcall(function()
+                            if kind == "judgement" then
+                                -- Judgement of the Storm: heavy vertical knockdown (Hitdown_L = 12) capable of knocking down even dragons,
+                                -- with ZERO ragdoll launch velocity so enemies collapse in place and NEVER fly away!
                                 info.DamageType = 12
                                 info.DamageActType = 12
                                 info.OverwriteBlownType = 12
-                                info.DamageReaction = 480
+                                info.DamageReaction = isLethal and 45 or (isLargeMonster and 2400 or 650)
                                 info.BlownReactionRate = 0
                                 info.BlownReactionConvertLevel = 0
                                 info.IsTwoRankUpReaction = false
@@ -3525,6 +3533,26 @@ pcall(function()
                                 info.HitBackY = 0
                                 info.HitBackAddZ = 0
                                 info.HitBackVec = Vector3f.new(0, 0, 0)
+                                if isLethal and dbg.smite and dbg.smite.mark_dead then
+                                    pcall(dbg.smite.mark_dead, info)
+                                end
+                            elseif kind == "javelin" and isSmallFlyer then
+                                -- Harpies / small flyers: clean knockdown out of the air to the ground (Hitdown_L = 12, zero horizontal launch!)
+                                info.DamageType = 12
+                                info.DamageActType = 12
+                                info.OverwriteBlownType = 12
+                                info.DamageReaction = isLethal and 45 or 480
+                                info.BlownReactionRate = 0
+                                info.BlownReactionConvertLevel = 0
+                                info.IsTwoRankUpReaction = false
+                                info.ForceFactor = 0
+                                info.HitBackZ = 0
+                                info.HitBackY = 0
+                                info.HitBackAddZ = 0
+                                info.HitBackVec = Vector3f.new(0, 0, 0)
+                                if isLethal and dbg.smite and dbg.smite.mark_dead then
+                                    pcall(dbg.smite.mark_dead, info)
+                                end
                             else
                                 -- Grounded enemies & Large Monsters (Dragons, Minotaurs, Chimeras, Ogres): light flinch only, NEVER knocks down a dragon or large monster!
                                 info.DamageType = 6                     -- Hitback_M (clean flinch impact, NO stun / NO knockdown)
@@ -3992,20 +4020,28 @@ pcall(function()
                     local b = blast_of(info:get_AttackHitController())
                     if b and BLAST[b.kind].flinchOnly then s2.pbCap = info end
                 end
-                if PB.activeVocation == "stormblade" and PB.javelinT and (os.clock() - PB.javelinT < 1.8) and live.go then
-                    local ahc = info:get_AttackHitController()
-                    local go = ahc and ahc:get_GameObject()
-                    if go and go:get_address() ~= live.go then
-                        local owner = nil
-                        pcall(function() owner = ahc:get_CachedOwner() end)
-                        if not owner then
-                            pcall(function()
-                                local sh = go:call("getComponent(System.Type)", sdk.typeof("app.Shell"))
-                                owner = sh and sh:get_AttackOwner()
-                            end)
-                        end
-                        if owner and owner:get_address() == live.go then
-                            s2.pbJavelin = info
+                if PB.activeVocation == "stormblade" and live.go then
+                    local isJavNow = PB.javelinT and (os.clock() - PB.javelinT < 1.8)
+                    local isJudgNow = PB.judgementT and (os.clock() - PB.judgementT < 2.8)
+                    if isJavNow or isJudgNow then
+                        local ahc = info:get_AttackHitController()
+                        local go = ahc and ahc:get_GameObject()
+                        if go and go:get_address() ~= live.go then
+                            local owner = nil
+                            pcall(function() owner = ahc:get_CachedOwner() end)
+                            if not owner then
+                                pcall(function()
+                                    local sh = go:call("getComponent(System.Type)", sdk.typeof("app.Shell"))
+                                    owner = sh and sh:get_AttackOwner()
+                                end)
+                            end
+                            if owner and owner:get_address() == live.go then
+                                if isJudgNow and (not isJavNow or (PB.judgementT or 0) >= (PB.javelinT or 0)) then
+                                    s2.pbJudgement = info
+                                else
+                                    s2.pbJavelin = info
+                                end
+                            end
                         end
                     end
                 end
@@ -4013,10 +4049,40 @@ pcall(function()
         end, function(r)
             local s2 = thread.get_hook_storage()
             local isJav = s2.pbJavelin
-            local info = s2.pbCap or isJav
+            local isJudg = s2.pbJudgement
+            local info = s2.pbCap or isJav or isJudg
             s2.pbCap = nil
             s2.pbJavelin = nil
+            s2.pbJudgement = nil
             if not info then return r end
+            if isJudg then
+                local _, isLargeMonster = PB.classify_victim(info)
+                local isLethal = false
+                pcall(function()
+                    local v = info["<DamageGameObject>k__BackingField"]
+                    local ch = v and v:call("getComponent(System.Type)", sdk.typeof("app.Character"))
+                    local hit = ch and (ch["<Hit>k__BackingField"] or ch:call("get_Hit"))
+                    if hit then isLethal = ((info.Damage or 0) >= (hit:call("get_Hp") or 999999)) end
+                end)
+                pcall(function()
+                    info.DamageType = 12                    -- Hitdown_L (drops straight down in place, NO horizontal ragdoll launch!)
+                    info.DamageActType = 12
+                    info.OverwriteBlownType = 12
+                    info.DamageReaction = isLethal and 45 or (isLargeMonster and 2400 or 650)
+                    info.BlownReactionRate = 0
+                    info.BlownReactionConvertLevel = 0
+                    info.IsTwoRankUpReaction = false
+                    info.ForceFactor = 0
+                    info.HitBackZ = 0
+                    info.HitBackY = 0
+                    info.HitBackAddZ = 0
+                    info.HitBackVec = Vector3f.new(0, 0, 0)
+                end)
+                if isLethal and dbg.smite and dbg.smite.mark_dead then
+                    pcall(dbg.smite.mark_dead, info)
+                end
+                return sdk.to_ptr(12)
+            end
             if isJav then
                 local isSmallFlyer, isLargeMonster = PB.classify_victim(info)
                 local reactType = isSmallFlyer and 12 or 6
@@ -9601,7 +9667,7 @@ function sm.mark_dead(info)
 end
 pcall(function()
     sdk.hook(sdk.find_type_definition("app.DamageRagdollBlow"):get_method("start(via.behaviortree.ActionArg)"), function(args)
-        local isJav = (PB.javelinT and os.clock() - PB.javelinT < 3.0)
+        local isJav = (PB.javelinT and os.clock() - PB.javelinT < 3.0) or (PB.judgementT and os.clock() - PB.judgementT < 3.5)
         if not isJav and (not sm.dead or os.clock() > sm.dead.untilT) then return end
         pcall(function()
             local this = sdk.to_managed_object(args[2])
@@ -9692,12 +9758,40 @@ pcall(function()
             pcall(function()
                 local info = sdk.to_managed_object(args[3])
                 if sm.stage and my_smite_hit(info) then st.smPow = info end
-                if live.on and PB.activeVocation == "stormblade" and PB.javelinT and (os.clock() - PB.javelinT < 3.0) then
-                    st.pbJavPow = info
+                if live.on and PB.activeVocation == "stormblade" then
+                    local isJavNow = PB.javelinT and (os.clock() - PB.javelinT < 2.0)
+                    local isJudgNow = PB.judgementT and (os.clock() - PB.judgementT < 3.0)
+                    if isJudgNow and (not isJavNow or (PB.judgementT or 0) >= (PB.javelinT or 0)) then
+                        st.pbJudgPow = info
+                    elseif isJavNow then
+                        st.pbJavPow = info
+                    end
                 end
             end)
         end, function(r)
             local st = thread.get_hook_storage()
+            local judgInfo = st.pbJudgPow
+            st.pbJudgPow = nil
+            if judgInfo then
+                local _, isLargeMonster = PB.classify_victim(judgInfo)
+                local isLethal = false
+                pcall(function()
+                    local v = judgInfo["<DamageGameObject>k__BackingField"]
+                    local ch = v and v:call("getComponent(System.Type)", sdk.typeof("app.Character"))
+                    local hit = ch and (ch["<Hit>k__BackingField"] or ch:call("get_Hit"))
+                    if hit then isLethal = ((judgInfo.Damage or 0) >= (hit:call("get_Hp") or 999999)) end
+                end)
+                pcall(function()
+                    judgInfo.DamageReaction = isLethal and 45 or (isLargeMonster and 2400 or 650)
+                    judgInfo.ForceFactor = 0
+                    judgInfo.BlownReactionRate = 0
+                    judgInfo.BlownReactionConvertLevel = 0
+                    judgInfo.HitBackZ = 0
+                    judgInfo.HitBackY = 0
+                    judgInfo.HitBackAddZ = 0
+                    judgInfo.HitBackVec = Vector3f.new(0, 0, 0)
+                end)
+            end
             local jInfo = st.pbJavPow
             st.pbJavPow = nil
             if jInfo then
