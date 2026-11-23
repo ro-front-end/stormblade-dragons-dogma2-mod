@@ -26,10 +26,8 @@ re.on_frame(function()
         skills.update_core_skills()
     end
 
-    -- Attack speed must be evaluated on active frames
-    if core.is_active() then
-        skills.update_attack_speed()
-    end
+    -- Attack speed is handled by Pactblade.lua (update_speed with Tempest Reflexes 1.60x);
+    -- do not overwrite player:set_speed here.
 end)
 
 -- Clean teardown on script reset

@@ -48,20 +48,8 @@ local function refresh_character_equipment(itemId)
 end
 
 local function ensure_thunder_boon()
-    local player = core.get_player()
-    if not player or not player:valid() or not player.character then return end
-    pcall(function()
-        local statuses = require("DragonCore.game.statuses")
-        if player:weapon_drawn() then
-            if not statuses.active(player.character, "thunder_boon") then
-                statuses.apply(player.character, "thunder_boon")
-            end
-        else
-            if statuses.active(player.character, "thunder_boon") then
-                statuses.cure(player.character, "thunder_boon")
-            end
-        end
-    end)
+    -- Thunder Boon is already managed on the main UpdateBehavior thread in Pactblade.lua;
+    -- avoid duplicate reqStatusConditionApplyCore calls from re.on_frame.
 end
 
 --- Restores any modified weapon stats back to vanilla
