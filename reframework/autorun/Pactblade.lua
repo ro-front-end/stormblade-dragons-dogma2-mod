@@ -5998,27 +5998,30 @@ end)()
         end
     end
 
-    -- 4. Stormblade 5 Rank-Scaled Augmentations (Fulmination, Tempest Reflexes, Thew, Overload, Eye of the Hurricane)
+    -- 4. Stormblade 6 Rank-Scaled Augmentations (Fulmination, Tempest Reflexes, Thew, Storm Stride +5 kg, Overload, Eye of the Hurricane)
     PB.AUGMENTS = {
         { id = "fulmination",      rank = 2, dcp = 300,  vanilla_name = "Mettle",      name = "Fulmination",          desc = "+15 Strength & +15 Magick (300 Dcp)",                        ui_desc = "Increases your Strength and Magick by +15 while wielding a sword as a Stormblade." },
         { id = "tempest_reflexes", rank = 4, dcp = 900,  vanilla_name = "Provocation", name = "Tempest Reflexes",     desc = "+30% Sword Attack Speed (1.60x) (900 Dcp)",                  ui_desc = "Hones your reflexes with lightning currents, increasing your sword attack speed to 1.60x." },
-        { id = "thew",             rank = 6, dcp = 1800, vanilla_name = "Thew",        name = "Thew",                 desc = "Carry Additional Weight (+10 kg) (1800 Dcp)",                 ui_desc = "Enables you to carry additional weight." },
+        { id = "thew",             rank = 6, dcp = 1800, vanilla_name = "Thew",        name = "Thew",                 desc = "Carry Additional Weight (+10 kg) (1800 Dcp)",                 ui_desc = "Enables you to carry additional weight (+10 kg)." },
         { id = "overload",         rank = 8, dcp = 3000, vanilla_name = "Diligence",   name = "Overload",             desc = "+12% Thunder damage vs Weak / Drenched targets (3000 Dcp)",  ui_desc = "Increases Thunder damage by +12% when striking monster weakpoints or drenched and shocked foes." },
         { id = "eye_of_hurricane", rank = 9, dcp = 5000, vanilla_name = "Dominion",    name = "Eye of the Hurricane", desc = "-10% Skill Stamina Cost (5000 Dcp)",                        ui_desc = "Being at the calm center of the storm reduces the Stamina cost of all Weapon Skills by 10%." },
+        { id = "storm_stride",     rank = 7, dcp = 2400, vanilla_name = "Intrepidity", name = "Storm Stride",         desc = "Carry Additional Weight (+5 kg) (2400 Dcp)",                  ui_desc = "Electro-kinetic posture lightens your burden, allowing you to carry +5 kg of additional weight." },
     }
     PB.augment_ability_ids = {}
-    PB.augments_unlock_all = false -- Progressive unlock by Stormblade Vocation Rank (Ranks 2, 4, 6, 8, 9)
+    PB.augments_unlock_all = false -- Progressive unlock by Stormblade Vocation Rank (Ranks 2, 4, 6, 7, 8, 9)
     PB.augments_enabled = {
         fulmination = true,
         tempest_reflexes = true,
         thew = true,
         overload = true,
         eye_of_hurricane = true,
+        storm_stride = true,
     }
     PB.augment_ranks = {
         fulmination = 2,
         tempest_reflexes = 4,
         thew = 6,
+        storm_stride = 7,
         overload = 8,
         eye_of_hurricane = 9,
     }
@@ -6183,8 +6186,45 @@ end)()
         end
     end)
 
-    -- Fulmination (Rank 2: +15 Strength & +15 Magick via Stormblade/weapons.lua) & Aegis of the Storm (Rank 6: +45 Magick Defense)
-    local sbAugMod = { sword = nil, armor = nil, lastCheck = 0 }
+    -- Storm Stride (Rank 7: +5 kg Carry Weight Capacity)
+    -- Hooks MaxWeight / LimitWeight getters on PlayerStatusCalculator / StatusContext / Human / ItemManager so the player can carry +5.0 kg more
+    pcall(function()
+        local BONUS_KG = 5.0
+        for _, tname in ipairs({ "app.PlayerStatusCalculator", "app.HumanStatusContext", "app.CharacterStatusContext", "app.PlayerBasicAttackDefenceStatus" }) do
+            local td = sdk.find_type_definition(tname)
+            if td then
+                for _, m in ipairs(td:get_methods()) do
+                    local okN, nm = pcall(function() return m:get_name() end)
+                    local okR, rt = pcall(function() return m:get_return_type():get_full_name() end)
+                    if okN and okR and rt == "System.Single" and (
+                        nm == "get_MaxWeight"
+                        or nm == "get_LimitWeight"
+                        or nm == "calcMaxWeight"
+                        or nm == "getMaxWeight"
+                    ) then
+                        pcall(function()
+                            sdk.hook(m, function(args)
+                                thread.get_hook_storage().sbWeightObj = args[2]
+                            end, function(r)
+                                if not live.on or PB.activeVocation ~= "stormblade" or not PB.has_augment("storm_stride") then return r end
+                                local okW, newR = pcall(function()
+                                    local v = sdk.to_float(r)
+                                    if v and v >= 15.0 and v <= 500.0 then
+                                        return sdk.float_to_ptr(v + BONUS_KG)
+                                    end
+                                end)
+                                if okW and newR then return newR end
+                                return r
+                            end)
+                        end)
+                    end
+                end
+            end
+        end
+    end)
+
+    -- Fulmination (Rank 2: +15 Strength & +15 Magick via Stormblade/weapons.lua) & Storm Stride (+5 kg equipment weight relief fallback)
+    local sbAugMod = { sword = nil, armor = nil, weightItems = {}, lastCheck = 0 }
     PB.sbAugMod = sbAugMod
 
     local function restore_sb_aug_items()
@@ -6203,6 +6243,14 @@ end)()
             sbAugMod.armor = nil
             changed = true
         end
+        if sbAugMod.weightItems and next(sbAugMod.weightItems) ~= nil then
+            for _, wm in pairs(sbAugMod.weightItems) do
+                pcall(function() wm.param._Weight = wm.origW end)
+                if wm.own then pcall(function() wm.own._Weight = wm.origOwnW end) end
+            end
+            sbAugMod.weightItems = {}
+            changed = true
+        end
         if changed then
             pcall(refresh_equipment, nil)
         end
@@ -6211,7 +6259,7 @@ end)()
     function PB.update_stormblade_augments(forceRestore)
         _G.SB_SAVE_GUARD = (forceRestore or dbg.guardHold) and true or false
         if forceRestore or dbg.guardHold or not live.on or PB.activeVocation ~= "stormblade" then
-            if (_G.SB_FULMINATION_BONUS and _G.SB_FULMINATION_BONUS ~= 0) or sbAugMod.armor then
+            if (_G.SB_FULMINATION_BONUS and _G.SB_FULMINATION_BONUS ~= 0) or sbAugMod.armor or (sbAugMod.weightItems and next(sbAugMod.weightItems) ~= nil) then
                 restore_sb_aug_items()
                 note("Stormblade Augmentations: restored base weapon/armor stats")
             end
@@ -6290,6 +6338,73 @@ end)()
             pcall(function() old.param._MagicDefence = old.origMdef end)
             if old.own then pcall(function() old.own._MagicDefence = old.origOwnMdef end) end
             sbAugMod.armor = nil
+            needRefresh = true
+        end
+
+        -- 3. Storm Stride (Rank 7: +5.0 kg carry relief by lightening equipped weapon/armor weight by up to 5.0 kg)
+        local wantStride = PB.has_augment("storm_stride")
+        if wantStride and data then
+            local currentEquipped = {}
+            for _, slotIdx in ipairs({ 0, 3, 4, 2, 5 }) do -- Main(0), Upper(3), Lower(4), Helm(2), Mantle(5)
+                local sd = data:call("get(app.EquipData.SlotEnum)", slotIdx)
+                local id = sd and sd:get_field("_ItemId")
+                if id and id > 0 then
+                    currentEquipped[id] = sd
+                end
+            end
+            for id, wm in pairs(sbAugMod.weightItems) do
+                if not currentEquipped[id] then
+                    pcall(function() wm.param._Weight = wm.origW end)
+                    if wm.own then pcall(function() wm.own._Weight = wm.origOwnW end) end
+                    sbAugMod.weightItems[id] = nil
+                    needRefresh = true
+                end
+            end
+            local totalSaved = 0.0
+            for _, wm in pairs(sbAugMod.weightItems) do
+                totalSaved = totalSaved + (wm.saved or 0.0)
+            end
+            for _, slotIdx in ipairs({ 0, 3, 4, 2, 5 }) do
+                if totalSaved >= 4.99 then break end
+                local sd = data:call("get(app.EquipData.SlotEnum)", slotIdx)
+                local id = sd and sd:get_field("_ItemId")
+                if id and id > 0 and not sbAugMod.weightItems[id] then
+                    local okW, wparam = pcall(function() return im:call("getItemData(System.Int32)", id) end)
+                    if okW and wparam and wparam._Weight and wparam._Weight > 0.05 then
+                        local origW = tonumber(wparam._Weight) or 0
+                        local take = math.min(5.0 - totalSaved, math.max(0, origW - 0.01))
+                        if take > 0.01 then
+                            local newW = math.max(0.01, origW - take)
+                            local ownObj, origOwnW = nil, nil
+                            pcall(function()
+                                local o = sd:get_field("_ItemData")
+                                if o and o:get_address() ~= wparam:get_address() and o:get_field("_Weight") ~= nil then
+                                    ownObj = o:add_ref()
+                                    origOwnW = o._Weight
+                                end
+                            end)
+                            sbAugMod.weightItems[id] = { id = id, param = wparam:add_ref(), origW = origW, newW = newW, saved = take, own = ownObj, origOwnW = origOwnW }
+                            wparam._Weight = newW
+                            if ownObj then ownObj._Weight = newW end
+                            totalSaved = totalSaved + take
+                            needRefresh = true
+                        end
+                    end
+                elseif id and sbAugMod.weightItems[id] then
+                    local wm = sbAugMod.weightItems[id]
+                    if math.abs((wm.param._Weight or 0) - wm.newW) > 0.01 then
+                        wm.param._Weight = wm.newW
+                        if wm.own then wm.own._Weight = wm.newW end
+                        needRefresh = true
+                    end
+                end
+            end
+        elseif sbAugMod.weightItems and next(sbAugMod.weightItems) ~= nil then
+            for _, wm in pairs(sbAugMod.weightItems) do
+                pcall(function() wm.param._Weight = wm.origW end)
+                if wm.own then pcall(function() wm.own._Weight = wm.origOwnW end) end
+            end
+            sbAugMod.weightItems = {}
             needRefresh = true
         end
 
@@ -6530,8 +6645,10 @@ end)()
     local origCustomRanks = {}
     local origNormalRanks = {}
     local origAbilityRanks = {}
-    local AUG_ID_BY_RANK = { [2] = "fulmination", [4] = "tempest_reflexes", [6] = "thew", [8] = "overload", [9] = "eye_of_hurricane" }
-    local VANILLA_AUG_RANKS = { 2, 4, 6, 8, 9 }
+    local origExtraAugRank = nil
+    local extraAugInjectedId = nil
+    local AUG_ID_BY_RANK = { [2] = "fulmination", [4] = "tempest_reflexes", [6] = "thew", [7] = "storm_stride", [8] = "overload", [9] = "eye_of_hurricane" }
+    local VANILLA_AUG_RANKS = { 2, 4, 6, 8, 9, 7 }
     local guildDefsHidden = false
     local lastGuildStateKey = nil
 
@@ -6595,9 +6712,32 @@ end)()
                     p._UnlockRank = 99
                 end
             end)
+            -- Inject 6th augment (Storm Stride: +5 kg Carry Weight) into Job01's AbilityDefineDictionary from Job05 (Warrior's first augment)
+            pcall(function()
+                if adict and not extraAugInjectedId then
+                    local wdict = gm.AbilityDefineDictionary and gm.AbilityDefineDictionary["Job05"]
+                    if wdict then
+                        each_dict_entry(wdict, function(waid, wp, wSlot)
+                            if wSlot == 1 and not extraAugInjectedId then
+                                extraAugInjectedId = waid
+                                origExtraAugRank = wp._UnlockRank
+                                origAbilityRanks[waid] = 7
+                                PB.augment_ability_ids["storm_stride"] = waid
+                                pcall(function()
+                                    if not adict:ContainsKey(waid) then
+                                        adict:Add(waid, wp)
+                                    end
+                                end)
+                            end
+                        end)
+                    end
+                end
+            end)
             each_dict_entry(adict, function(aid, p, slotIdx)
                 if origAbilityRanks[aid] == nil then
-                    if p._UnlockRank and p._UnlockRank ~= 99 and p._UnlockRank ~= 1 then
+                    if aid == extraAugInjectedId then
+                        origAbilityRanks[aid] = 7
+                    elseif p._UnlockRank and p._UnlockRank ~= 99 and p._UnlockRank ~= 1 then
                         origAbilityRanks[aid] = p._UnlockRank
                     else
                         origAbilityRanks[aid] = VANILLA_AUG_RANKS[slotIdx] or 9
@@ -6727,7 +6867,7 @@ end)()
             end)
         end
 
-        -- Rename the 5 Fighter Augments in the Vocation Guild (Mettle, Provocation, Thew, Diligence, Dominion) to Stormblade's 5 Augmentations
+        -- Rename the 6 Augments in the Vocation Guild (Mettle, Provocation, Thew, Diligence, Dominion + Warrior's 1st augment) to Stormblade's 6 Augmentations
         local AUG_BY_NAME = {
             ["Mettle"]             = PB.AUGMENTS[1],
             ["Provocation"]        = PB.AUGMENTS[2],
@@ -6736,6 +6876,9 @@ end)()
             ["Aegis of the Storm"] = PB.AUGMENTS[3],
             ["Diligence"]          = PB.AUGMENTS[4],
             ["Dominion"]           = PB.AUGMENTS[5],
+            ["Pertinacity"]        = PB.AUGMENTS[6],
+            ["Intrepidity"]        = PB.AUGMENTS[6],
+            ["Vitality"]           = PB.AUGMENTS[6],
         }
         local AUG_BY_DESC = {
             ["Augments your physical Defense."] = PB.AUGMENTS[1],
@@ -6746,6 +6889,9 @@ end)()
             ["Hastens recovery when downed or crawling."] = PB.AUGMENTS[4],
             ["Augments the Knockdown Power of your normal attacks."] = PB.AUGMENTS[5],
             ["Allows you to lift up and pin down foes for an extended duration."] = PB.AUGMENTS[5],
+            ["Augments your maximum Health."] = PB.AUGMENTS[6],
+            ["Makes it easier to break through an enemy's guard."] = PB.AUGMENTS[6],
+            ["Reduces the accumulation of loss gauge damage taken."] = PB.AUGMENTS[6],
         }
         local function match_aug_desc(clean)
             if AUG_BY_DESC[clean] then return AUG_BY_DESC[clean] end
@@ -6754,6 +6900,7 @@ end)()
             if clean:find("downed or crawling", 1, true) then return PB.AUGMENTS[4] end
             if clean:find("lift up and pin down", 1, true) then return PB.AUGMENTS[5] end
             if clean:find("Knockdown Power of your normal attacks", 1, true) and not clean:find("10%", 1, true) then return PB.AUGMENTS[5] end
+            if clean:find("maximum Health", 1, true) or clean:find("enemy's guard", 1, true) or clean:find("loss gauge", 1, true) then return PB.AUGMENTS[6] end
             return nil
         end
         local function retext_stormblade_augments(this)
