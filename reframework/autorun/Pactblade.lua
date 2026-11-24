@@ -3494,9 +3494,9 @@ pcall(function()
                     local dmg = 0
 
                     if kind == "javelin" or kind == "judgement" then
-                        -- Javelin & Judgement: JobMagic shell 8 has 0 native damage on Job01; scale balanced from player Strength
+                        -- Judgement of the Storm: high-damage 5-bolt storm matrix (0.62x Strength per bolt), zero knockdown
                         local str = (PB.player_strength and PB.player_strength()) or 120
-                        local ratio = (kind == "javelin") and 0.72 or 0.34
+                        local ratio = (kind == "judgement") and 0.62 or 0.55
                         dmg = math.max(1, math.floor(str * ratio * overloadMul + 0.5))
                         info.Damage = dmg
                         pcall(function() info.IsMagicAttack = true end)
@@ -3509,66 +3509,21 @@ pcall(function()
                         info.Damage = dmg
                     end
                     if kind == "javelin" or kind == "judgement" then
-                        local isSmallFlyer, isLargeMonster = PB.classify_victim(info)
-                        local isLethal = false
+                        -- Pure damage only: NEVER knocks down dragons, chimeras, or any creature (DamageType = 6 Hitback_M, DamageActType = 1 Flinch, DamageReaction = 0)
                         pcall(function()
-                            local v = info["<DamageGameObject>k__BackingField"]
-                            local ch = v and v:call("getComponent(System.Type)", sdk.typeof("app.Character"))
-                            local hit = ch and (ch["<Hit>k__BackingField"] or ch:call("get_Hit"))
-                            if hit then isLethal = ((info.Damage or 0) >= (hit:call("get_Hp") or 999999)) end
-                        end)
-                        pcall(function()
-                            if kind == "judgement" then
-                                -- Judgement of the Storm: heavy vertical knockdown (Hitdown_L = 12) capable of knocking down even dragons,
-                                -- with ZERO ragdoll launch velocity so enemies collapse in place and NEVER fly away!
-                                info.DamageType = 12
-                                info.DamageActType = 12
-                                info.OverwriteBlownType = 12
-                                info.DamageReaction = isLethal and 45 or (isLargeMonster and 2400 or 650)
-                                info.BlownReactionRate = 0
-                                info.BlownReactionConvertLevel = 0
-                                info.IsTwoRankUpReaction = false
-                                info.ForceFactor = 0
-                                info.HitBackZ = 0
-                                info.HitBackY = 0
-                                info.HitBackAddZ = 0
-                                info.HitBackVec = Vector3f.new(0, 0, 0)
-                                if isLethal and dbg.smite and dbg.smite.mark_dead then
-                                    pcall(dbg.smite.mark_dead, info)
-                                end
-                            elseif kind == "javelin" and isSmallFlyer then
-                                -- Harpies / small flyers: clean knockdown out of the air to the ground (Hitdown_L = 12, zero horizontal launch!)
-                                info.DamageType = 12
-                                info.DamageActType = 12
-                                info.OverwriteBlownType = 12
-                                info.DamageReaction = isLethal and 45 or 480
-                                info.BlownReactionRate = 0
-                                info.BlownReactionConvertLevel = 0
-                                info.IsTwoRankUpReaction = false
-                                info.ForceFactor = 0
-                                info.HitBackZ = 0
-                                info.HitBackY = 0
-                                info.HitBackAddZ = 0
-                                info.HitBackVec = Vector3f.new(0, 0, 0)
-                                if isLethal and dbg.smite and dbg.smite.mark_dead then
-                                    pcall(dbg.smite.mark_dead, info)
-                                end
-                            else
-                                -- Grounded enemies & Large Monsters (Dragons, Minotaurs, Chimeras, Ogres): light flinch only, NEVER knocks down a dragon or large monster!
-                                info.DamageType = 6                     -- Hitback_M (clean flinch impact, NO stun / NO knockdown)
-                                info.DamageActType = 1                  -- Flinch (NOT Down / Stun)
-                                info.OverwriteBlownType = 6
-                                info.DamageReaction = isLargeMonster and 12 or 85
-                                info.StaminaDamage = isLargeMonster and 0 or (info.StaminaDamage or 0)
-                                info.BlownReactionRate = 0
-                                info.BlownReactionConvertLevel = 0
-                                info.IsTwoRankUpReaction = false
-                                info.ForceFactor = 0
-                                info.HitBackZ = math.min(info.HitBackZ or 0, 0.8)
-                                info.HitBackY = 0                       -- Grounded, no lift!
-                                info.HitBackAddZ = 0
-                                info.HitBackVec = Vector3f.new(0, 0, 0)
-                            end
+                            info.DamageType = 6                     -- Hitback_M (clean flinch impact, NO stun / NO knockdown)
+                            info.DamageActType = 1                  -- Flinch (NEVER Down / Knockdown)
+                            info.OverwriteBlownType = 6
+                            info.DamageReaction = 0                 -- Zero knockdown accumulation
+                            info.StaminaDamage = 0
+                            info.BlownReactionRate = 0
+                            info.BlownReactionConvertLevel = 0
+                            info.IsTwoRankUpReaction = false
+                            info.ForceFactor = 0
+                            info.HitBackZ = 0
+                            info.HitBackY = 0
+                            info.HitBackAddZ = 0
+                            info.HitBackVec = Vector3f.new(0, 0, 0)
                         end)
                         pcall(function()
                             local victim = info["<DamageGameObject>k__BackingField"]
@@ -4055,20 +4010,13 @@ pcall(function()
             s2.pbJavelin = nil
             s2.pbJudgement = nil
             if not info then return r end
-            if isJudg then
-                local _, isLargeMonster = PB.classify_victim(info)
-                local isLethal = false
+            if isJudg or isJav then
                 pcall(function()
-                    local v = info["<DamageGameObject>k__BackingField"]
-                    local ch = v and v:call("getComponent(System.Type)", sdk.typeof("app.Character"))
-                    local hit = ch and (ch["<Hit>k__BackingField"] or ch:call("get_Hit"))
-                    if hit then isLethal = ((info.Damage or 0) >= (hit:call("get_Hp") or 999999)) end
-                end)
-                pcall(function()
-                    info.DamageType = 12                    -- Hitdown_L (drops straight down in place, NO horizontal ragdoll launch!)
-                    info.DamageActType = 12
-                    info.OverwriteBlownType = 12
-                    info.DamageReaction = isLethal and 45 or (isLargeMonster and 2400 or 650)
+                    info.DamageType = 6                     -- Hitback_M (clean flinch, NEVER knocks down anything!)
+                    info.DamageActType = 1                  -- Flinch
+                    info.OverwriteBlownType = 6
+                    info.DamageReaction = 0
+                    info.StaminaDamage = 0
                     info.BlownReactionRate = 0
                     info.BlownReactionConvertLevel = 0
                     info.IsTwoRankUpReaction = false
@@ -4078,30 +4026,7 @@ pcall(function()
                     info.HitBackAddZ = 0
                     info.HitBackVec = Vector3f.new(0, 0, 0)
                 end)
-                if isLethal and dbg.smite and dbg.smite.mark_dead then
-                    pcall(dbg.smite.mark_dead, info)
-                end
-                return sdk.to_ptr(12)
-            end
-            if isJav then
-                local isSmallFlyer, isLargeMonster = PB.classify_victim(info)
-                local reactType = isSmallFlyer and 12 or 6
-                pcall(function()
-                    info.DamageType = reactType             -- 12 = Hitdown_L (drops harpies straight down), 6 = Hitback_M (flinch)
-                    info.DamageActType = isSmallFlyer and 12 or 1
-                    info.OverwriteBlownType = reactType
-                    info.DamageReaction = isSmallFlyer and 480 or (isLargeMonster and 12 or 85)
-                    if isLargeMonster then info.StaminaDamage = 0 end
-                    info.BlownReactionRate = 0
-                    info.BlownReactionConvertLevel = 0
-                    info.IsTwoRankUpReaction = false
-                    info.ForceFactor = 0
-                    info.HitBackZ = isSmallFlyer and 0 or math.min(info.HitBackZ or 0, 0.8)
-                    info.HitBackY = 0
-                    info.HitBackAddZ = 0
-                    info.HitBackVec = Vector3f.new(0, 0, 0)
-                end)
-                return sdk.to_ptr(reactType)
+                return sdk.to_ptr(6)
             end
             local v = sdk.to_int64(r) & 0xFFFFFFFF
             if not HEAVIER[v] then return r end
@@ -5604,15 +5529,11 @@ end)()
         if not a or not a:valid() then return end
         local now = os.clock()
         -- Heavy attack (Triangle / Y):
-        -- Quick tap (< 0.48s) = 100% vanilla Fighter Heavy stab / Downed finisher (Untouched, no stutter, no delay!)
-        -- Hold (>= 0.48s, or >= 0.28s with Tempest Overcharge) = Stormblade Lightning Javelin Charge & Throw (35 Stamina)
+        -- 100% vanilla Fighter Heavy stab / Tusk Toss charged sword slash / Downed finisher (Lightning Javelin removed per user feedback)
         local cur_act = a:current_action(0) or ""
-        local is_finisher = cur_act:find("FinishingMove") or cur_act:find("DownAttack")
-
-        -- Core Skill 2: Tempest Overcharge (Rank 4) - Light sword slashes grant 2.5s of faster Heavy Levin charge (0.28s vs 0.48s)
-        if cur_act == "Job01_AttackLeft" or cur_act == "Job01_AttackRight" or cur_act == "Job01_AttackAir" or cur_act:find("^Job01_ComboAttack") or cur_act:find("^Job01_JustAttack") then
-            PB.tempestOverchargeUntil = now + 2.5
-        end
+        PB.heavy_charge = nil
+        PB.heavy_hold_t0 = nil
+        PB.javelin_active = false
 
         -- Core Skill 1: Static Counter (Rank 2) - Electric discharge ONLY when an actual Lightning Step (RB) dodge executes against an incoming blow or active attacker
         if cur_act == PB.DODGE and (now - (PB.lastDodgeAt or 0) > 0.35) then
@@ -5664,129 +5585,7 @@ end)()
             end
         end
 
-        local reqHold = (PB.has_core_skill and PB.has_core_skill("overcharge") and now <= (PB.tempestOverchargeUntil or 0)) and 0.28 or 0.48
-        if a:button_down("AttackL") and not is_finisher then
-            if not PB.heavy_hold_t0 then
-                PB.heavy_hold_t0 = now
-            end
-            local hold_time = now - PB.heavy_hold_t0
-            if hold_time >= reqHold then
-                if not PB.heavy_charge or PB.heavy_charge.phase == "idle" then
-                    PB.heavy_charge = { phase = "charged", t0 = now }
-                    note(("Stormblade: Lightning Javelin charged (%.2fs)!"):format(reqHold))
-                end
-            end
-        else
-            if PB.heavy_charge and PB.heavy_charge.phase == "charged" then
-                -- Player released after a full charge: check stamina & cadence before unleashing Lightning Javelin!
-                PB.heavy_charge.phase = "idle"
-                PB.heavy_hold_t0 = nil
-                local javCost = (PB.has_augment and PB.has_augment("eye_of_hurricane")) and 32 or 35
-                local canCast, curStam, isExh = true, 999, false
-                if PB.check_stamina then
-                    canCast, curStam, isExh = PB.check_stamina(a, javCost)
-                end
-                if now - (PB.lastJavelinCastAt or 0) < 0.90 then
-                    note("Stormblade: Lightning Javelin on brief recovery cooldown")
-                elseif not canCast then
-                    note(("Stormblade: Lightning Javelin blocked (stamina: %.0f/%.0f, exhausted: %s)"):format(curStam, javCost, tostring(isExh)))
-                else
-                    PB.lastJavelinCastAt = now
-                    drain_player_stamina(a, javCost, "Lightning Javelin")
-                    -- Use clean forward cast/throw (Job07_MagicBindComplete), NEVER Unto Heven's baseball catapult!
-                    pcall(function()
-                        a:request_action("Job07_MagicBindComplete", 0)
-                    end)
-                    pcall(function()
-                        if a.character and a.character.FullBodyLayer then
-                            a.character.FullBodyLayer:call("set_PlaySpeed", 1.35)
-                        end
-                    end)
-                    PB.javelin_active = true
-                    PB.javelin_t0 = now
-                    PB.javelinT = now
-                    PB.javelin_spawned = false
-                    note("Stormblade: Lightning Javelin unleashed from charged release!")
-                end
-            else
-                -- Released without charging: Reset timer, normal heavy stab finishes cleanly
-                PB.heavy_charge = nil
-                PB.heavy_hold_t0 = nil
-            end
-        end
-
-        if PB.javelin_active then
-            local elapsed = now - (PB.javelin_t0 or now)
-            if not PB.javelin_spawned and elapsed >= 0.12 then
-                PB.javelin_spawned = true
-                PB.javelinT = now
-                local t = dbg.beam and dbg.beam.aim_pick and dbg.beam.aim_pick(a, 0.6)
-                local targetPos = nil
-                if t then
-                    pcall(function()
-                        local tr = t:get_GameObject():get_Transform()
-                        local p = tr:get_Position()
-                        local hip = t.Hip or tr:call("getJointByName", "Hip")
-                        if hip then
-                            local hp = hip:get_Position()
-                            if hp and math.abs(hp.y - p.y) < 12 then p = hp end
-                        end
-                        targetPos = p
-                    end)
-                end
-                local shell_node = {
-                    type = "shell",
-                    id = "sb_javelin",
-                    shell = PB.JOBMAGIC_SHELLS or "AppSystem/Shell/UserData/HumanShellParamData_JobMagic.user",
-                    shell_id = 8,
-                    scale = 1.15,
-                    cast = targetPos and { mode = "target" } or { mode = "owner", offset = { 0, 0, 2.5 }, face = "owner" },
-                    element = "Thunder",
-                    damage_type = "Hitback_M"
-                }
-                local res, err = spawn(a, shell_node, targetPos and { aim = targetPos } or nil)
-                if res and res.record then
-                    colour_shell(res.record, { 0.30, 0.85, 1.0, 1.0 }, 6.0, true)
-                    note("Stormblade: Lightning Javelin hurled!")
-                end
-            end
-
-            -- Responsive recovery: restore control immediately after cast completion on input or auto-timeout
-            if elapsed >= 0.28 then
-                local curAct = tostring(a:current_action(0) or "")
-                local wantsInput = false
-                pcall(function()
-                    if a.input and a.input:call("isLeverInputL") then wantsInput = true end
-                    if a:button_pressed("Attack") or a:button_pressed("HeavyAttack") or a:button_pressed("Jump") or a:button_pressed("JobSpecialAction") or a:button_pressed("AttackL") then
-                        wantsInput = true
-                    end
-                end)
-
-                if wantsInput or elapsed >= 0.40 or (curAct ~= "Job07_MagicBindComplete" and curAct ~= "") then
-                    if curAct == "Job07_MagicBindComplete" then
-                        pcall(function()
-                            a:request_action(a:is_grounded() == false and "WaitToFall" or "NormalLocomotion", 0)
-                        end)
-                    end
-                    pcall(function()
-                        if a.character and a.character.FullBodyLayer then
-                            a.character.FullBodyLayer:call("set_PlaySpeed", 1.0)
-                        end
-                    end)
-                    PB.javelin_active = false
-                end
-            end
-            if elapsed >= 0.75 then
-                PB.javelin_active = false
-                pcall(function()
-                    if a.character and a.character.FullBodyLayer then
-                        a.character.FullBodyLayer:call("set_PlaySpeed", 1.0)
-                    end
-                end)
-            end
-        end
-
-        -- Cleanse any residual MagicBind paralysis on javelin targets (Zero stun, pure damage)
+        -- Cleanse any residual MagicBind paralysis on Judgement targets (Zero stun, pure damage)
         if PB.javelin_unbind_targets and #PB.javelin_unbind_targets > 0 then
             local now_t = os.clock()
             for i = #PB.javelin_unbind_targets, 1, -1 do
@@ -9922,16 +9721,9 @@ pcall(function()
             local judgInfo = st.pbJudgPow
             st.pbJudgPow = nil
             if judgInfo then
-                local _, isLargeMonster = PB.classify_victim(judgInfo)
-                local isLethal = false
                 pcall(function()
-                    local v = judgInfo["<DamageGameObject>k__BackingField"]
-                    local ch = v and v:call("getComponent(System.Type)", sdk.typeof("app.Character"))
-                    local hit = ch and (ch["<Hit>k__BackingField"] or ch:call("get_Hit"))
-                    if hit then isLethal = ((judgInfo.Damage or 0) >= (hit:call("get_Hp") or 999999)) end
-                end)
-                pcall(function()
-                    judgInfo.DamageReaction = isLethal and 45 or (isLargeMonster and 2400 or 650)
+                    judgInfo.DamageReaction = 0
+                    judgInfo.StaminaDamage = 0
                     judgInfo.ForceFactor = 0
                     judgInfo.BlownReactionRate = 0
                     judgInfo.BlownReactionConvertLevel = 0
@@ -9944,13 +9736,12 @@ pcall(function()
             local jInfo = st.pbJavPow
             st.pbJavPow = nil
             if jInfo then
-                local isSmallFlyer, isLargeMonster = PB.classify_victim(jInfo)
                 pcall(function()
-                    jInfo.DamageReaction = isSmallFlyer and 480 or (isLargeMonster and 12 or 85)
-                    if isLargeMonster then jInfo.StaminaDamage = 0 end
+                    jInfo.DamageReaction = 0
+                    jInfo.StaminaDamage = 0
                     jInfo.ForceFactor = 0
                     jInfo.BlownReactionRate = 0
-                    jInfo.HitBackZ = isSmallFlyer and 0 or math.min(jInfo.HitBackZ or 0, 0.8)
+                    jInfo.HitBackZ = 0
                     jInfo.HitBackY = 0
                     jInfo.HitBackAddZ = 0
                     jInfo.HitBackVec = Vector3f.new(0, 0, 0)
