@@ -3482,7 +3482,7 @@ pcall(function()
                     local mul = (kind == "slash" and 1.35)
                              or (kind == "static_counter" and 0.65)
                              or (kind == "storm_carve" and 0.50)
-                             or (kind == "omnislash" and 0.60)
+                             or (kind == "omnislash" and 0.72)
                              or (kind == "thunderstrike" and 0.65)
                              or (kind == "levin" and 0.90)
                              or (kind == "nova" and 0.85)
@@ -3494,9 +3494,9 @@ pcall(function()
                     local dmg = 0
 
                     if kind == "javelin" or kind == "judgement" then
-                        -- Judgement of the Storm: high-damage 5-bolt storm matrix (0.62x Strength per bolt), zero knockdown
+                        -- Judgement of the Storm: high-damage 5-bolt storm matrix (0.68x Strength per bolt), zero knockdown
                         local str = (PB.player_strength and PB.player_strength()) or 120
-                        local ratio = (kind == "judgement") and 0.62 or 0.55
+                        local ratio = (kind == "judgement") and 0.68 or 0.55
                         dmg = math.max(1, math.floor(str * ratio * overloadMul + 0.5))
                         info.Damage = dmg
                         pcall(function() info.IsMagicAttack = true end)
@@ -3587,7 +3587,8 @@ pcall(function()
                     end
                     local baseSword = tonumber(info.Damage) or 0
                     if baseSword > 0 then
-                        info.Damage = math.max(1, math.floor(baseSword * 0.78 * om + 0.5))
+                        local swordMul = (combo.stage and combo.stage > 0) and 0.90 or 0.78
+                        info.Damage = math.max(1, math.floor(baseSword * swordMul * om + 0.5))
                     end
                 end
                 if kind == "charged" and live.on then   -- (3.34: the beam's damage base: the game's raw magick value)
@@ -4053,7 +4054,7 @@ local COMBO = {
     { action = "Job01_RushAttackFinish", from = 25.0, to = 54.0, warp = "behind" },
     { action = "Job01_EndRisingLunge", from = 0.0, warp = "head" },
 }
-local COMBO_STAMINA = 250
+local COMBO_STAMINA = 550
 local WARP_GAP = 1.2         -- metres between the target's body and us
 local HEAD_ABOVE = 0.4       -- metres above the target's head for the falling strike
 local HEAD_GAP = 0.6         -- ... and this close in front of its body
@@ -4425,14 +4426,13 @@ local function combo_update(a)
         combo.want = false
         if combo.stage == 0 then
             if PB.activeVocation == "stormblade" and PB.check_stamina then
-                local cost = (PB.has_augment and PB.has_augment("eye_of_hurricane")) and 225 or COMBO_STAMINA
-                local canCast, curStam, isExh = PB.check_stamina(a, 50)
+                local cost = (PB.has_augment and PB.has_augment("eye_of_hurricane")) and math.floor(COMBO_STAMINA * 0.90 + 0.5) or COMBO_STAMINA
+                local canCast, curStam, isExh = PB.check_stamina(a, 120)
                 if not canCast then
                     note(("Stormblade: Omnislash blocked (stamina: %.0f/%.0f, exhausted: %s)"):format(curStam, cost, tostring(isExh)))
                     return
                 end
-                -- Native Job01_BravesRaid translation already drains ~220-245 stamina; only drain manually if native didn't
-                if curStam >= cost + 200 and (now - (dbg.adapter and dbg.adapter.lastRead or 0) > 9999) and PB.drain_stamina then
+                if PB.drain_stamina then
                     PB.drain_stamina(a, cost, "Omnislash: Raijin")
                 end
             else
