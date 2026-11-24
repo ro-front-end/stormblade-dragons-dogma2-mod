@@ -61,7 +61,7 @@ re.on_draw_ui(function()
                         vp.set(s)
                     end
                     pcall(function()
-                        for _, slot in ipairs({ 0, 1, 4 }) do
+                        for slot = 0, 9 do
                             local p = string.format("VSB/state/saves/slot_%d.json", slot)
                             local d = json.load_file(p)
                             if d then
@@ -69,6 +69,7 @@ re.on_draw_ui(function()
                                     d.vocation_progress.points.stormblade = 0
                                 end
                                 d.custom = {}
+                                d.normal = nil
                                 d.equipped = nil
                                 json.dump_file(p, d)
                             end
