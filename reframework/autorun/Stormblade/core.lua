@@ -53,12 +53,12 @@ function core.update()
     state.game_object = player.game_object and player.game_object:get_address()
     state.weapon_job = player:weapon_job()
 
-    -- Check shield equipment status
+    -- Check shield equipment status safely via fields only (never call get_Weapon() during slot transitions)
     state.shield_worn = false
     pcall(function()
         local holder = player.character:get_WeaponAndItemHolder()
         local left = holder and holder:get_LeftWeapon()
-        state.shield_worn = (left ~= nil and left:get_Weapon() ~= nil)
+        state.shield_worn = (left ~= nil and left:get_field("IsStartPrepare") ~= true and left:get_field("<Weapon>k__BackingField") ~= nil)
     end)
 
     -- Stormblade is active when picked in VSB and wielding a sword (Job01)

@@ -21,13 +21,15 @@ end
 
 local function get_held_weapon_id()
     local player = core.get_player()
-    if not player or not player:valid() then return nil end
+    if not player or not player:valid() or not player.character then return nil end
     local id = nil
     pcall(function()
         local holder = player.character:get_WeaponAndItemHolder()
-        local right = holder and holder:get_RightWeapon()
-        local w = right and right:get_Weapon()
-        if w then id = w:get_WeaponID() end
+        local slot = holder and holder:get_RightWeapon()
+        if not slot then return end
+        if slot:get_field("IsStartPrepare") == true then return end
+        local w = slot:get_field("<Weapon>k__BackingField")
+        if w then id = w.ID end
     end)
     return id
 end
