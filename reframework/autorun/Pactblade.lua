@@ -302,7 +302,6 @@ pcall(function()   -- (4.04) a skill's own big drain swapped for our cost (dbg.s
     end, function(r) return r end)
 end)
 local STAMINA_TD = sdk.find_type_definition("app.StaminaManager")
-local STAMINA_ADD = STAMINA_TD and STAMINA_TD:get_method("add(System.Single, System.Boolean)")
 local STAMINA_SET_REM = STAMINA_TD and (STAMINA_TD:get_method("set_RemainingAmount(System.Single)") or STAMINA_TD:get_method("setRemainingAmount(System.Single)"))
 
 local function drain_player_stamina(a, cost, label)
@@ -311,12 +310,12 @@ local function drain_player_stamina(a, cost, label)
     local b0 = smg:get_RemainingAmount() or 0
     local target = math.max(0, b0 - cost)
 
-    if STAMINA_ADD then
-        pcall(function() STAMINA_ADD:call(smg, -cost, true) end)
-    end
-    pcall(function() smg:call("add", -cost, true) end)
+    local ok = false
     if STAMINA_SET_REM then
-        pcall(function() STAMINA_SET_REM:call(smg, target) end)
+        ok = pcall(function() STAMINA_SET_REM:call(smg, target) end)
+    end
+    if not ok then
+        ok = pcall(function() smg:call("add(System.Single, System.Boolean)", -cost, true) end)
     end
     pcall(function() smg:set_field("<RemainingAmount>k__BackingField", target) end)
 
@@ -324,7 +323,6 @@ local function drain_player_stamina(a, cost, label)
     note(("Stormblade: %s stamina drain (b0: %.0f -> final: %.0f, cost: %.0f)"):format(label or "Lightning Step", b0, final, cost))
     if target <= 0 then
         pcall(function() smg:call("setTired", true) end)
-        pcall(function() smg:call("setIsTired", true) end)
     end
     return true
 end
@@ -588,13 +586,27 @@ end
                 local integ = package.loaded["VSB.game.integration"] or require("VSB.game.integration")
                 local ss = package.loaded["VSB.game.savesafety"] or require("VSB.game.savesafety")
                 local vp = package.loaded["VSB.game.vocprogress"] or require("VSB.game.vocprogress")
-                -- Find the most recent valid Stormblade save sidecar (slot_0, slot_4, slot_1)
+                -- Find the most recent valid Stormblade save sidecar (including slot 5 / 6 / 9 / 0 / 4 / 1)
                 local bestSlot, bestData = nil, nil
-                for _, sl in ipairs({ 0, 4, 1 }) do
+                for _, sl in ipairs({ 0, 4, 1, 5, 6, 9 }) do
                     local d = json.load_file(("VSB/state/saves/slot_%d.json"):format(sl))
                     if type(d) == "table" and d.vocation_progress and d.vocation_progress.points and (tonumber(d.vocation_progress.points.stormblade) or 0) > 0 then
-                        bestSlot, bestData = sl, d
-                        break
+                        local hasEquipped = type(d.equipped) == "table" and next(d.equipped) ~= nil
+                        if not bestData or (hasEquipped and not (type(bestData.equipped) == "table" and next(bestData.equipped) ~= nil)) then
+                            bestSlot, bestData = sl, d
+                        end
+                    end
+                end
+                if bestData then
+                    for _, sl in ipairs({ 5, 6, 9 }) do
+                        local p = ("VSB/state/saves/slot_%d.json"):format(sl)
+                        local d = json.load_file(p)
+                        if type(d) == "table" and d.equipped == nil and bestData.equipped ~= nil then
+                            d.custom = bestData.custom
+                            d.normal = bestData.normal
+                            d.equipped = bestData.equipped
+                            pcall(json.dump_file, p, d)
+                        end
                     end
                 end
                 if vp and bestData and bestData.vocation_progress then
@@ -605,7 +617,7 @@ end
                 end
                 if ss and ss.status and bestData then
                     if ss.status.current_slot == nil then ss.status.current_slot = bestSlot end
-                    if ss.status.memory == nil then
+                    if ss.status.memory == nil or ss.status.memory.equipped == nil then
                         ss.status.memory = bestData
                         ss.status.reapply = true
                     end
@@ -1097,7 +1109,6 @@ local function colour_update()
                                 local id = data.id
                                 local idstr = ("%d/%d/%d"):format(id.DataContainerIndex, id.ContainerID, id.ElementID)
                                 skip = (PB.activeVocation ~= "stormblade") and (cfg.noTint[idstr] == true or (dbg.partsIds and dbg.partsIds[idstr]) == true)
-                                if not skip and dbg.coloured then dbg.coloured(idstr, "projectile walk", "projectile") end
                                 dbg.walkSeen = dbg.walkSeen or {}
                                 local r = dbg.walkSeen[idstr] or { n = 0, how = "projectile" }
                                 r.n, r.last = r.n + 1, os.clock()
@@ -1606,6 +1617,8 @@ update_body = function()
         cfg.blastTint = true
         cfg.armTint = false
         cfg.bind = false
+        cfg.afterimage = false
+        if dbg.rebuke then dbg.rebuke.on = false end
         pcall(function()
             if a and a.character and a.character.Locomotion then
                 local isRunning = false
@@ -2580,7 +2593,6 @@ function dbg.coloured(idstr, how, by)
     pcall(json.dump_file, "Pactblade_coloured.json", all)
 end
 local function tint_note(idstr, how)
-    if dbg.coloured then dbg.coloured(idstr, how, "requested") end
     local r = tintRecent[idstr] or { n = 0, how = how }
     r.n, r.last = r.n + 1, os.clock()
     tintRecent[idstr] = r
@@ -3762,9 +3774,10 @@ end
     local function before_change(why)
         dbg.noxHoldUntil = os.clock() + 1.0
         if not noxPlaying then return end
-        pcall(function() if noxPlaying.cont then noxPlaying.cont:call("killAll") end end)
-        pcall(function() if noxPlaying.glowComp then noxPlaying.glowComp:call(GLOW_FINISH, NOX.glowMode, -1, -1) end end)
-        noxPlaying = nil
+        local np = noxPlaying
+        noxPlaying = nil -- clear first to prevent recursive equipPrepared re-entry
+        pcall(function() if np.cont then np.cont:call("killAll") end end)
+        pcall(function() if np.glowComp then np.glowComp:call(GLOW_FINISH, NOX.glowMode, -1, -1) end end)
         dbg.noxDropBlade = true
         dbg.noxStops = (dbg.noxStops or 0) + 1
         note("Nox look stopped before the weapon change (" .. why .. ")")
@@ -4828,7 +4841,16 @@ end
 
 -- the player's joints, found by name once (all names saved to data/Pactblade_joints.json)
 function wisps.find_joints(a)
-    if wisps.joints then return wisps.joints end
+    local goAddr = a and a.character and a.character:get_GameObject():get_address()
+    if wisps.joints and wisps.jointsGo == goAddr then
+        local okJ = pcall(function()
+            for _, list in pairs(wisps.joints) do
+                for _, j in ipairs(list) do j:get_Position() end
+            end
+        end)
+        if okJ then return wisps.joints end
+    end
+    wisps.jointsGo = goAddr
     local tr = a.character:get_GameObject():get_Transform()
     local names, byName = {}, {}
     pcall(function()
@@ -6052,9 +6074,7 @@ end)()
             sbAugMod.weightItems = {}
             changed = true
         end
-        if changed then
-            pcall(refresh_equipment, nil)
-        end
+        -- Note: never call applyEquipDataForCharacter inside save/online serialization hooks (causes equipPrepared recursion & memory corruption)
     end
 
     function PB.update_stormblade_augments(forceRestore)
@@ -6180,15 +6200,14 @@ end)()
                             pcall(function()
                                 local o = sd:get_field("_ItemData")
                                 if o and o:get_address() ~= wparam:get_address() and o:get_field("_Weight") ~= nil then
-                                    ownObj = o:add_ref()
+                                    ownObj = o
                                     origOwnW = o._Weight
                                 end
                             end)
-                            sbAugMod.weightItems[id] = { id = id, param = wparam:add_ref(), origW = origW, newW = newW, saved = take, own = ownObj, origOwnW = origOwnW }
+                            sbAugMod.weightItems[id] = { id = id, param = wparam, origW = origW, newW = newW, saved = take, own = ownObj, origOwnW = origOwnW }
                             wparam._Weight = newW
                             if ownObj then ownObj._Weight = newW end
                             totalSaved = totalSaved + take
-                            needRefresh = true
                         end
                     end
                 elseif id and sbAugMod.weightItems[id] then
@@ -6196,7 +6215,6 @@ end)()
                     if math.abs((wm.param._Weight or 0) - wm.newW) > 0.01 then
                         wm.param._Weight = wm.newW
                         if wm.own then wm.own._Weight = wm.newW end
-                        needRefresh = true
                     end
                 end
             end
@@ -6206,7 +6224,6 @@ end)()
                 if wm.own then pcall(function() wm.own._Weight = wm.origOwnW end) end
             end
             sbAugMod.weightItems = {}
-            needRefresh = true
         end
 
         if needRefresh then
@@ -12880,8 +12897,8 @@ end)()
         hr.lastCast = dbg.gclock()
         cast(a, o.who)
     end)
-    re.on_frame(function()   -- (4.13) the Mage cast bank (9112) kept on me while Pactblade is on
-        if not live.on or os.clock() < (hr.nextBank or 0) or not dbg.castT then return end
+    re.on_frame(function()   -- (4.13) the Mage cast bank (9112) kept on me while Pactblade is on (never on Stormblade)
+        if not live.on or PB.activeVocation == "stormblade" or os.clock() < (hr.nextBank or 0) or not dbg.castT then return end
         hr.nextBank = os.clock() + 5
         pcall(function() dbg.castT.bank(runtime.player()) end)
     end)
