@@ -54,15 +54,16 @@ end
 
 --- Restores any modified weapon stats back to vanilla
 function weapons.restore()
-    pcall(function()
-        local player = core.get_player()
-        if player and player:valid() and player.character then
-            local statuses = require("DragonCore.game.statuses")
-            statuses.cure(player.character, "thunder_boon")
-        end
-    end)
     if not backup then return end
+    local is_save_guard = _G.SB_SAVE_GUARD == true
     pcall(function()
+        if not is_save_guard then
+            local player = core.get_player()
+            if player and player:valid() and player.character then
+                local statuses = require("DragonCore.game.statuses")
+                statuses.cure(player.character, "thunder_boon")
+            end
+        end
         if backup.param then
             backup.param._PhysicalAttack = backup.original_phys
             backup.param._MagicAttack = backup.original_mag
@@ -75,7 +76,9 @@ function weapons.restore()
             backup.own.obj._Element = backup.own.el
             backup.own.obj._ElementStore = backup.own.store
         end
-        refresh_character_equipment(backup.itemId)
+        if not is_save_guard then
+            refresh_character_equipment(backup.itemId)
+        end
     end)
     backup = nil
 end
@@ -132,7 +135,7 @@ function weapons.update()
     if not ok or not param then return end
 
     backup = {
-        param = param:add_ref(),
+        param = param,
         id = weapon_id,
         itemId = param._Id,
         original_phys = param._PhysicalAttack,
@@ -150,7 +153,7 @@ function weapons.update()
         local own = sd and sd:get_field("_ItemData")
         if own and own:get_address() ~= param:get_address() and own:get_field("_PhysicalAttack") ~= nil then
             backup.own = {
-                obj = own:add_ref(),
+                obj = own,
                 phys = own._PhysicalAttack,
                 mag = own._MagicAttack,
                 el = own._Element,
