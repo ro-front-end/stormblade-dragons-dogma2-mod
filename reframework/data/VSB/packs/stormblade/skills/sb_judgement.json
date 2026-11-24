@@ -25,7 +25,7 @@
   },
   "costs": {
     "stamina": {
-      "amount": 600,
+      "amount": 450,
       "at_frame": 0
     }
   },
