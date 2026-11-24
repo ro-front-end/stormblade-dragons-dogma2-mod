@@ -410,7 +410,7 @@ dbg.live = live   -- (1.0) for callbacks defined above this line
 -- (i-0.7) Dimension Door (from the user's standalone mod 0.8.5): reframework/autorun/Pactblade/DimensionDoor.lua
 do
     local okDD, DD = pcall(require, "Pactblade.DimensionDoor")
-    if okDD and type(DD) == "table" then DD.pactblade = function() return live.on end; DD.release = json.RELEASE == true; dbg.dd = DD
+    if okDD and type(DD) == "table" then DD.pactblade = function() return live.on and PB.activeVocation ~= "stormblade" end; DD.release = json.RELEASE == true; dbg.dd = DD
     else dbg.ddErr = tostring(DD) end
 end
 function dbg.dd_block() local ok, b = pcall(function() return dbg.dd and dbg.dd.block() end); return ok and b end
@@ -990,6 +990,7 @@ local warmed = false
 local function warm_up(a)
     if warmed then return end
     warmed = true
+    if PB.activeVocation == "stormblade" then return end
     for _, kind in ipairs({ "tap", "charged", "burst", "small", "wave" }) do
         local b = BLAST[kind] or { shell = kind == "wave" and 6 or 11 }   -- "small": 11's launch flash; "wave": Magike Cut
         local res = spawn(a, { type = "shell", id = "eldritch_warmup", shell = PB.JOB07_SHELLS, shell_id = b.shell,
@@ -1616,7 +1617,7 @@ update_body = function()
     live.shieldWorn = false
     pcall(function()
         local left = a.character:get_WeaponAndItemHolder():get_LeftWeapon()
-        live.shieldWorn = left ~= nil and left:get_Weapon() ~= nil
+        live.shieldWorn = left ~= nil and left:get_field("IsStartPrepare") ~= true and left:get_field("<Weapon>k__BackingField") ~= nil
     end)
     pcall(update_speed, a)
     if live.settled and not warmed then pcall(warm_up, a) end
@@ -5972,43 +5973,9 @@ end)()
     end)
 
     -- Storm Stride (Rank 7: +5 kg Carry Weight Capacity)
-    -- Hooks MaxWeight / LimitWeight getters on PlayerStatusCalculator / StatusContext / Human / ItemManager so the player can carry +5.0 kg more
-    pcall(function()
-        local BONUS_KG = 5.0
-        for _, tname in ipairs({ "app.PlayerStatusCalculator", "app.HumanStatusContext", "app.CharacterStatusContext", "app.PlayerBasicAttackDefenceStatus" }) do
-            local td = sdk.find_type_definition(tname)
-            if td then
-                for _, m in ipairs(td:get_methods()) do
-                    local okN, nm = pcall(function() return m:get_name() end)
-                    local okR, rt = pcall(function() return m:get_return_type():get_full_name() end)
-                    if okN and okR and rt == "System.Single" and (
-                        nm == "get_MaxWeight"
-                        or nm == "get_LimitWeight"
-                        or nm == "calcMaxWeight"
-                        or nm == "getMaxWeight"
-                    ) then
-                        pcall(function()
-                            sdk.hook(m, function(args)
-                                thread.get_hook_storage().sbWeightObj = args[2]
-                            end, function(r)
-                                if not live.on or PB.activeVocation ~= "stormblade" or not PB.has_augment("storm_stride") then return r end
-                                local okW, newR = pcall(function()
-                                    local v = sdk.to_float(r)
-                                    if v and v >= 15.0 and v <= 500.0 then
-                                        return sdk.float_to_ptr(v + BONUS_KG)
-                                    end
-                                end)
-                                if okW and newR then return newR end
-                                return r
-                            end)
-                        end)
-                    end
-                end
-            end
-        end
-    end)
+    -- Handled cleanly in PB.update_stormblade_augments via equipped item weight relief (-5.0 kg) with zero worker-thread getter hooks.
 
-    -- Fulmination (Rank 2: +15 Strength & +15 Magick via Stormblade/weapons.lua) & Storm Stride (+5 kg equipment weight relief fallback)
+    -- Fulmination (Rank 2: +15 Strength & +15 Magick via Stormblade/weapons.lua) & Storm Stride (+5 kg equipment weight relief)
     local sbAugMod = { sword = nil, armor = nil, weightItems = {}, lastCheck = 0 }
     PB.sbAugMod = sbAugMod
 
@@ -6492,27 +6459,8 @@ end)()
                     p._UnlockRank = 99
                 end
             end)
-            -- Inject 6th augment (Storm Stride: +5 kg Carry Weight) into Job01's AbilityDefineDictionary from Job05 (Warrior's first augment)
-            pcall(function()
-                if adict and not extraAugInjectedId then
-                    local wdict = gm.AbilityDefineDictionary and gm.AbilityDefineDictionary["Job05"]
-                    if wdict then
-                        each_dict_entry(wdict, function(waid, wp, wSlot)
-                            if wSlot == 1 and not extraAugInjectedId then
-                                extraAugInjectedId = waid
-                                origExtraAugRank = wp._UnlockRank
-                                origAbilityRanks[waid] = 7
-                                PB.augment_ability_ids["storm_stride"] = waid
-                                pcall(function()
-                                    if not adict:ContainsKey(waid) then
-                                        adict:Add(waid, wp)
-                                    end
-                                end)
-                            end
-                        end)
-                    end
-                end
-            end)
+            -- Note: Never call adict:Add() on AbilityDefineDictionary["Job01"] (causes C# Dictionary resize & memory corruption).
+            -- Storm Stride (+5 kg carry weight relief) activates automatically at Rank 7+.
             each_dict_entry(adict, function(aid, p, slotIdx)
                 if origAbilityRanks[aid] == nil then
                     if aid == extraAugInjectedId then
@@ -9909,7 +9857,7 @@ function sm.load_sounds(a)
 end
 -- loaded early (once Pactblade is on), so the first smite already has them (the first play after loading can be silent)
 re.on_frame(function()   -- (checked every 5 s: back in if the game threw them out)
-    if not live.on or os.clock() < (sm.nextLoadTry or 0) then return end
+    if not live.on or PB.activeVocation == "stormblade" or os.clock() < (sm.nextLoadTry or 0) then return end
     sm.nextLoadTry = os.clock() + 5
     local a = runtime.player()
     if a then pcall(sm.load_sounds, a) end
@@ -13474,7 +13422,7 @@ end)()
         return p
     end
     re.on_frame(function()
-        if not live.on then return end
+        if not live.on or PB.activeVocation == "stormblade" then return end
         SL.refresh()
         tick()
         if not SL.show or paused() then return end
