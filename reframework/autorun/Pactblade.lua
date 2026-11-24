@@ -584,44 +584,6 @@ end
             tries = -1
             pcall(function()
                 local integ = package.loaded["VSB.game.integration"] or require("VSB.game.integration")
-                local ss = package.loaded["VSB.game.savesafety"] or require("VSB.game.savesafety")
-                local vp = package.loaded["VSB.game.vocprogress"] or require("VSB.game.vocprogress")
-                -- Find the most recent valid Stormblade save sidecar (including slot 5 / 6 / 9 / 0 / 4 / 1)
-                local bestSlot, bestData = nil, nil
-                for _, sl in ipairs({ 0, 4, 1, 5, 6, 9 }) do
-                    local d = json.load_file(("VSB/state/saves/slot_%d.json"):format(sl))
-                    if type(d) == "table" and d.vocation_progress and d.vocation_progress.points and (tonumber(d.vocation_progress.points.stormblade) or 0) > 0 then
-                        local hasEquipped = type(d.equipped) == "table" and next(d.equipped) ~= nil
-                        if not bestData or (hasEquipped and not (type(bestData.equipped) == "table" and next(bestData.equipped) ~= nil)) then
-                            bestSlot, bestData = sl, d
-                        end
-                    end
-                end
-                if bestData then
-                    for _, sl in ipairs({ 5, 6, 9 }) do
-                        local p = ("VSB/state/saves/slot_%d.json"):format(sl)
-                        local d = json.load_file(p)
-                        if type(d) == "table" and d.equipped == nil and bestData.equipped ~= nil then
-                            d.custom = bestData.custom
-                            d.normal = bestData.normal
-                            d.equipped = bestData.equipped
-                            pcall(json.dump_file, p, d)
-                        end
-                    end
-                end
-                if vp and bestData and bestData.vocation_progress then
-                    local curPts = vp.points_of and vp.points_of("stormblade") or 0
-                    if curPts <= 0 then
-                        pcall(vp.set, bestData.vocation_progress)
-                    end
-                end
-                if ss and ss.status and bestData then
-                    if ss.status.current_slot == nil then ss.status.current_slot = bestSlot end
-                    if ss.status.memory == nil or ss.status.memory.equipped == nil then
-                        ss.status.memory = bestData
-                        ss.status.reapply = true
-                    end
-                end
                 if app.picks.Job01 == nil or app.picks.Job01 == "pactblade" then
                     if integ and integ.pick_vocation then
                         pcall(integ.pick_vocation, "Job01", wantVoc)
